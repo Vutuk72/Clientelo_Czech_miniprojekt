@@ -1,0 +1,1 @@
+# Clientelo_Czech_miniprojekt
