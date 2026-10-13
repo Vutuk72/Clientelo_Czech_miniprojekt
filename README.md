@@ -5,7 +5,7 @@ Vybral jsem si zadaní A jelikož je mi to bližší, ze zadání jsem pochopil 
 než začnu je potřeba rozmyslet architektonická rozhodnutí, dopady, otázky a udělat celou pipeline.
 
 kde nabrat data, jak vypadají, a jaké informace mě zajímají?
-jakou db použít oracle, psgSQL, mysql? ja bych si zvolil oracle, protože dělam projek v oracle
+jakou db použít oracle, psgSQL, mysql, vektorová db? ja bych si zvolil oracle, protože dělam projekt v oracle db, 
 jaké jazyky použít? vybral bych si kompilované z důvodu plus vrstvy ochrany jako Java, ale můžou být jiné.
 github nebo gitlab? ja bych si zvolil github kvůli ci/cd
 CI/CD? GitHub Actions
@@ -23,6 +23,7 @@ ja bych si ale nakodoval vlastní modelovací system a přidal funkci generován
 
 takový nástroj by měl roli kostry projektu, generoval by Model.xml, ORM kod, SQl pro migraci, dokumnetaci. Jeho výhoda by byla konzistentnost jelikož bude generovaný generátorem a ne AI.
 nevýhoda torm je wip, orm je zatím pro stack java, oracle db, data lineage a dopadová analýza funguje nevím jak dobře, data cubes jsou provizorně dělaný. migrace nejsou otestovný
+<img width="3824" height="1624" alt="torm-architektura" src="https://github.com/user-attachments/assets/f1873a9a-4d93-4123-bd0d-c80ac5c33351" />
 
 ## nasávání dat
 
@@ -41,8 +42,20 @@ z datového skladu můžem už zkoušet investorumů dát hodnocení, první vě
 
 role byla by to důležitá zpětná vazba, system musí mít trekování pro odhalení bottlenecků 
 
-chtěl bych tam mít statistiky z db, jak moc je zdravá, statistiku serveru. 
+chtěl bych tam mít statistiky z db, jak moc je zdravá, statistiku serveru. chtěl bych aktualní i historická data o systemu.
 
 ## co bych se musel naučit
 
 CI/CD, RUST, Fuzi logiku, 
+
+## graf jak by mohla vypadat pipelina toku dat
+<img width="2804" height="1424" alt="torm-sklad" src="https://github.com/user-attachments/assets/be49b247-3936-41b4-9f6e-f89e9bea1d44" />
+
+## jak si představuju cyklus vývoje 
+
+<img width="2904" height="2124" alt="torm-cicd" src="https://github.com/user-attachments/assets/9e7ff32c-d879-402e-8d6a-a26433db29a3" />
+
+## TORM CANVAS
+
+<img width="1857" height="902" alt="image" src="https://github.com/user-attachments/assets/365e4c90-b200-4c99-a9ae-da394cc6cb4f" />
+
