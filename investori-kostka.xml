@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Ukázková kostka: databáze investorů (VC fondy, private equity, family office,
+  andělé, velcí soukromí investoři).
+
+  Je schválně jednoduchá — jeden fakt, čtyři dimenze, žádná vločka.
+
+  Předpokládané provozní schéma (zatím neexistuje, jen na ukázku):
+    INVESTORS         kdo investuje        (ID, NAME, TYPE, COUNTRY_CODE, TOTAL_CAPITAL, VERIFIED)
+    COMPANIES         do koho se investuje (ID, NAME, SECTOR, COUNTRY_CODE)
+    DEALS             investiční kolo      (ID, COMPANY_ID, STAGE, ANNOUNCED_AT, ROUND_AMOUNT)
+    DEAL_INVESTORS    kdo se kola účastnil (DEAL_ID, INVESTOR_ID, AMOUNT, SOURCE_ID)
+    SOURCES           odkud to víme        (ID, NAME, KIND, RELIABILITY)
+
+  Zrnitost: jeden řádek = jeden investor v jednom investičním kole.
+  Do jednoho kola často jde víc investorů najednou, proto fakt nestojí na DEALS,
+  ale na DEAL_INVESTORS.
+
+  Pozor na velikost kola (DEALS.ROUND_AMOUNT): opakuje se u každého spoluinvestora,
+  takže by se sečetla vícekrát. Proto v kostce není — měří se jen částka investora.
+-->
+<cube-model xmlns="http://dbgen.cube/1.0" version="1.0">
+
+    <metadata>
+        <name>Investoři — investice</name>
+        <created>2026-10-13</created>
+    </metadata>
+
+    <database>
+        <vendor>oracle</vendor>
+    </database>
+
+    <dimensions>
+
+        <dimension concept="Čas" name="DIM_DATUM" table="DIM_DATUM" source-table="DEALS" key="DATUM_ID" key-type="integer">
+            <key-source expr="TO_NUMBER(TO_CHAR(DEALS.ANNOUNCED_AT, 'YYYYMMDD'))"/>
+            <description>Kdy bylo kolo oznámeno. Nejjemnější úroveň je den.</description>
+            <attribute concept="Den" name="DEN" column="DEN" type="date">
+                <source expr="TRUNC(DEALS.ANNOUNCED_AT)"/>
+            </attribute>
+            <attribute concept="Čtvrtletí" name="CTVRTLETI" column="CTVRTLETI" type="integer">
+                <source expr="TO_NUMBER(TO_CHAR(DEALS.ANNOUNCED_AT, 'Q'))"/>
+            </attribute>
+            <attribute concept="Rok" name="ROK" column="ROK" type="integer">
+                <source expr="EXTRACT(YEAR FROM DEALS.ANNOUNCED_AT)"/>
+            </attribute>
+            <hierarchy name="Kalendar">
+                <level>ROK</level>
+                <level>CTVRTLETI</level>
+                <level>DEN</level>
+            </hierarchy>
+        </dimension>
+
+        <dimension concept="Investor" name="DIM_INVESTOR" table="DIM_INVESTOR" source-table="INVESTORS" key="INVESTOR_ID" key-type="long">
+            <key-source table="INVESTORS" column="ID"/>
+            <description>Kdo investoval. Do kostky patří jen ověření investoři — náhodná firma sem nesmí.</description>
+            <attribute concept="Název investora" name="NAZEV" column="NAZEV" type="string">
+                <source table="INVESTORS" column="NAME"/>
+            </attribute>
+            <attribute concept="Typ investora" name="TYP" column="TYP" type="string">
+                <description>VC fond, private equity, family office, anděl, soukromý investor.</description>
+                <source table="INVESTORS" column="TYPE"/>
+            </attribute>
+            <attribute concept="Země investora" name="ZEME" column="ZEME" type="string">
+                <source table="INVESTORS" column="COUNTRY_CODE"/>
+            </attribute>
+            <attribute concept="Celkový kapitál" name="CELKOVY_KAPITAL" column="CELKOVY_KAPITAL" type="money">
+                <description>Kolik peněz investor celkem spravuje. Je to vlastnost investora, ne investice — proto leží tady, a ne ve faktu.</description>
+                <source table="INVESTORS" column="TOTAL_CAPITAL"/>
+            </attribute>
+            <attribute concept="Ověřený investor" name="OVERENY" column="OVERENY" type="boolean">
+                <source table="INVESTORS" column="VERIFIED"/>
+            </attribute>
+            <hierarchy name="PodleTypu">
+                <level>TYP</level>
+                <level>NAZEV</level>
+            </hierarchy>
+        </dimension>
+
+        <dimension concept="Firma" name="DIM_FIRMA" table="DIM_FIRMA" source-table="COMPANIES" key="FIRMA_ID" key-type="long">
+            <key-source table="COMPANIES" column="ID"/>
+            <description>Do koho se investovalo. Přes sektor firmy se dá říct, do čeho investor běžně investuje.</description>
+            <attribute concept="Název firmy" name="NAZEV" column="NAZEV" type="string">
+                <source table="COMPANIES" column="NAME"/>
+            </attribute>
+            <attribute concept="Sektor" name="SEKTOR" column="SEKTOR" type="string">
+                <source table="COMPANIES" column="SECTOR"/>
+            </attribute>
+            <attribute concept="Země firmy" name="ZEME" column="ZEME" type="string">
+                <source table="COMPANIES" column="COUNTRY_CODE"/>
+            </attribute>
+            <hierarchy name="PodleSektoru">
+                <level>SEKTOR</level>
+                <level>NAZEV</level>
+            </hierarchy>
+        </dimension>
+
+        <dimension concept="Zdroj informace" name="DIM_ZDROJ" table="DIM_ZDROJ" source-table="SOURCES" key="ZDROJ_ID" key-type="integer">
+            <key-source table="SOURCES" column="ID"/>
+            <description>Odkud údaj o investici pochází a jak moc se mu dá věřit.</description>
+            <attribute concept="Název zdroje" name="NAZEV" column="NAZEV" type="string">
+                <source table="SOURCES" column="NAME"/>
+            </attribute>
+            <attribute concept="Druh zdroje" name="DRUH" column="DRUH" type="string">
+                <description>Obchodní rejstřík, výroční zpráva, tisková zpráva, web investora…</description>
+                <source table="SOURCES" column="KIND"/>
+            </attribute>
+            <attribute concept="Spolehlivost" name="SPOLEHLIVOST" column="SPOLEHLIVOST" type="string">
+                <description>vysoká / střední / nízká</description>
+                <source table="SOURCES" column="RELIABILITY"/>
+            </attribute>
+            <hierarchy name="PodleSpolehlivosti">
+                <level>SPOLEHLIVOST</level>
+                <level>DRUH</level>
+                <level>NAZEV</level>
+            </hierarchy>
+        </dimension>
+
+    </dimensions>
+
+    <facts>
+
+        <fact concept="Investice" name="FAKT_INVESTICE" table="FAKT_INVESTICE" source-table="DEAL_INVESTORS">
+            <description>Účast jednoho investora v jednom investičním kole.</description>
+            <grain>jeden řádek = jeden investor v jednom investičním kole</grain>
+            <measure concept="Počet investic" name="POCET_INVESTIC" column="POCET_INVESTIC" agg="SUM" type="integer">
+                <description>Vždy jednička. Sečtením vyjde, kolikrát investor investoval.</description>
+                <source expr="1"/>
+            </measure>
+            <measure concept="Investovaná částka" name="CASTKA" column="CASTKA" agg="SUM" type="money">
+                <description>Kolik vložil právě tento investor. Často není veřejná — pak je prázdná a do součtu se nepočítá.</description>
+                <source table="DEAL_INVESTORS" column="AMOUNT"/>
+            </measure>
+            <measure concept="Průměrná investice" name="PRUMERNA_CASTKA" column="CASTKA" agg="AVG" type="money">
+                <description>V jaké výši investor běžně investuje.</description>
+                <source table="DEAL_INVESTORS" column="AMOUNT"/>
+            </measure>
+            <measure concept="Počet investorů" name="POCET_INVESTORU" column="INVESTOR_ID" agg="COUNT DISTINCT" type="integer">
+                <description>Kolik různých investorů. Nesčítá se přes úrovně, počítá se vždy ze základu.</description>
+                <source table="DEAL_INVESTORS" column="INVESTOR_ID"/>
+            </measure>
+        </fact>
+
+    </facts>
+
+    <links>
+        <link from="FAKT_INVESTICE" to="DIM_DATUM" column="DATUM_ID" concept="kdy se investovalo">
+            <source expr="TO_NUMBER(TO_CHAR(DEALS.ANNOUNCED_AT, 'YYYYMMDD'))"/>
+        </link>
+        <link from="FAKT_INVESTICE" to="DIM_INVESTOR" column="INVESTOR_ID" concept="kdo investoval">
+            <source table="DEAL_INVESTORS" column="INVESTOR_ID"/>
+        </link>
+        <link from="FAKT_INVESTICE" to="DIM_FIRMA" column="FIRMA_ID" concept="do koho se investovalo">
+            <source expr="DEALS.COMPANY_ID"/>
+        </link>
+        <link from="FAKT_INVESTICE" to="DIM_ZDROJ" column="ZDROJ_ID" concept="odkud to víme">
+            <source table="DEAL_INVESTORS" column="SOURCE_ID"/>
+        </link>
+    </links>
+
+</cube-model>
