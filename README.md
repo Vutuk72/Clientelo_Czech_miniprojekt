@@ -2,7 +2,7 @@
 
 Vybral jsem si zadaní A jelikož je mi to bližší, ze zadání jsem pochopil že chcete datový sklad investorů s jejím ohodnocením a scaleingem.
 
-v projektu je soubor investoři-kostka.xml lze jej otevřít pomocí grafického designu(.html) poslaný emailem.
+v projektu je soubor investoři-kostka.xml lze jej otevřít pomocí grafického designu(torm-cubes.html).
 
 než začnu je potřeba rozmyslet architektonická rozhodnutí, dopady, otázky a udělat celou pipeline.
 
