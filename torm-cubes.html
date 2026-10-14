@@ -1,0 +1,2797 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TORM Cubes — návrhář datových kostek</title>
+<style>
+  :root {
+    --chrome:  #252526;
+    --chrome2: #2d2d30;
+    --chrome3: #37373d;
+    --canvas:  #1a1d21;
+    --line:    #3a3d41;
+    --line2:   #4a4d52;
+    --txt:     #e4e4e4;
+    --txt2:    #9aa0a6;
+    --txt3:    #6f757b;
+    --accent:  #4c9aff;
+    --accent-bg: #16324f;
+    --green:   #56d364;
+    --red:     #f14c4c;
+    --amber:   #e0a83c;
+    --purple:  #b48ead;
+    --teal:    #3fb9a5;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  * { scrollbar-width: thin; scrollbar-color: #4a4d52 var(--canvas); }
+  ::-webkit-scrollbar { width: 11px; height: 11px; }
+  ::-webkit-scrollbar-track { background: var(--canvas); }
+  ::-webkit-scrollbar-thumb { background: #4a4d52; border-radius: 6px; border: 2px solid var(--canvas); }
+  ::-webkit-scrollbar-thumb:hover { background: #63676d; }
+  ::-webkit-scrollbar-corner { background: var(--canvas); }
+  html, body { height: 100%; overflow: hidden; }
+  body { background: var(--chrome); color: var(--txt); font-size: 12px;
+         font-family: "Segoe UI", system-ui, sans-serif; display: flex; flex-direction: column;
+         user-select: none; }
+  .spacer { flex: 1; }
+  .ic { width: 16px; height: 16px; flex: none; }
+  .ic24 { width: 24px; height: 24px; flex: none; }
+  svg.ic, svg.ic24 { stroke: currentColor; fill: none; stroke-width: 1.5;
+                     stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---------- titulní lišta a karty ---------- */
+  #titlebar { height: 30px; display: flex; align-items: stretch; background: var(--chrome2);
+              border-bottom: 1px solid var(--line); padding-left: 10px; }
+  #titlebar .logo { display: flex; align-items: center; font-size: 12px; color: var(--txt2);
+                    letter-spacing: .3px; padding-right: 12px; }
+  #titlebar .logo b { color: var(--accent); font-weight: 600; margin-left: 4px; }
+  .qat { display: flex; align-items: center; gap: 1px; padding: 0 8px;
+         border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+  .qb { background: none; border: 1px solid transparent; border-radius: 2px; color: var(--txt);
+        width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .qb:hover { background: var(--chrome3); border-color: var(--line2); }
+  .qb:disabled { color: var(--txt3); cursor: default; }
+  .qb:disabled:hover { background: none; border-color: transparent; }
+  .tabs { display: flex; align-items: flex-end; margin-left: 8px; }
+  .rt { background: none; border: none; border-bottom: 2px solid transparent; color: var(--txt2);
+        padding: 0 14px; height: 100%; font-size: 12px; cursor: pointer; font-family: inherit; }
+  .rt:hover { color: var(--txt); background: var(--chrome3); }
+  .rt.act { color: var(--txt); border-bottom-color: var(--accent); background: var(--chrome); }
+
+  /* ---------- pás karet ---------- */
+  #ribbon { background: var(--chrome); border-bottom: 1px solid var(--line); height: 88px; overflow: hidden; }
+  #ribbon.collapsed { height: 0; border-bottom: none; }
+  .rpage { display: none; height: 88px; align-items: stretch; padding: 0 2px; }
+  .rpage.act { display: flex; }
+  .rgroup { display: flex; align-items: flex-start; gap: 2px; padding: 4px 8px 0;
+            border-right: 1px solid var(--line); position: relative; }
+  .rcap { position: absolute; bottom: 2px; left: 0; right: 0; text-align: center;
+          font-size: 10px; color: var(--txt3); }
+  .rcol { display: flex; flex-direction: column; gap: 1px; }
+  .rbig { width: 66px; height: 62px; background: none; border: 1px solid transparent; border-radius: 2px;
+          color: var(--txt); display: flex; flex-direction: column; align-items: center;
+          justify-content: center; gap: 4px; cursor: pointer; font-size: 11px; line-height: 1.15;
+          text-align: center; font-family: inherit; padding: 2px; }
+  .rsm { height: 20px; min-width: 104px; background: none; border: 1px solid transparent; border-radius: 2px;
+         color: var(--txt); display: flex; align-items: center; gap: 6px; cursor: pointer;
+         font-size: 11.5px; padding: 0 6px; font-family: inherit; text-align: left; }
+  .rbig:hover, .rsm:hover { background: var(--chrome3); border-color: var(--line2); }
+  .rbig.act, .rsm.act { background: var(--accent-bg); border-color: var(--accent); color: #cfe3ff; }
+  .rbig.warn, .rsm.warn { color: var(--amber); }
+  .rbig.bad, .rsm.bad { color: var(--red); }
+
+  /* ---------- hlavní část ---------- */
+  #main { flex: 1; display: flex; min-height: 0; }
+  #rail { width: 48px; flex: none; background: var(--chrome2); border-right: 1px solid var(--line);
+          display: flex; flex-direction: column; align-items: center; padding: 5px 0; gap: 2px; }
+  .tool-b { width: 40px; height: 42px; background: none; border: 1px solid transparent; border-radius: 3px;
+            color: var(--txt2); display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 2px; cursor: pointer; font-size: 9px; font-family: inherit;
+            letter-spacing: .4px; }
+  .tool-b:hover { background: var(--chrome3); color: var(--txt); }
+  .tool-b.act { background: var(--accent-bg); border-color: var(--accent); color: #cfe3ff; }
+  .tool-b .ic { width: 17px; height: 17px; }
+  .rail-b { width: 34px; height: 30px; background: none; border: 1px solid transparent; border-radius: 3px;
+            color: var(--txt2); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .rail-b:hover { background: var(--chrome3); color: var(--txt); }
+  .rail-b.act { background: var(--accent-bg); color: #cfe3ff; }
+  .pop { position: absolute; left: 52px; bottom: 26px; z-index: 60; width: 280px; background: var(--chrome);
+         border: 1px solid var(--line2); border-radius: 4px; box-shadow: 0 6px 24px rgba(0,0,0,.55);
+         padding: 10px; display: none; }
+  .pop.on { display: block; }
+  .pop h4 { font-size: 11px; color: var(--txt2); text-transform: uppercase; letter-spacing: .5px;
+            margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px solid var(--line); }
+  .pop .note { font-size: 11px; color: var(--txt3); line-height: 1.5; margin-bottom: 8px; }
+  .pop .row2 { display: flex; align-items: center; gap: 7px; padding: 4px 0; font-size: 11.5px; }
+
+  /* ---------- prohlížeč modelu ---------- */
+  #browser { width: 236px; flex: none; background: var(--chrome); border-right: 1px solid var(--line);
+             display: flex; flex-direction: column; min-height: 0; }
+  #browser.off { display: none; }
+  .phead { height: 24px; display: flex; align-items: center; gap: 6px; padding: 0 4px 0 8px; font-size: 11px;
+           color: var(--txt2); background: var(--chrome2); border-bottom: 1px solid var(--line);
+           text-transform: uppercase; letter-spacing: .5px; flex: none; }
+  .pbtn { width: 20px; height: 20px; background: none; border: 1px solid transparent; border-radius: 3px;
+          color: var(--txt2); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .pbtn:hover { background: var(--chrome3); color: var(--txt); }
+  .stub { width: 20px; flex: none; background: var(--chrome2); border: none; color: var(--txt2);
+          cursor: pointer; display: none; align-items: flex-start; justify-content: center; padding-top: 7px; }
+  .stub.on { display: flex; }
+  .stub:hover { background: var(--chrome3); color: var(--txt); }
+  #stubBrowser { border-right: 1px solid var(--line); }
+  #stubPanel { border-left: 1px solid var(--line); }
+  .tree { flex: 1; overflow: auto; padding: 4px 0; }
+  .tr { display: flex; align-items: center; gap: 5px; height: 20px; padding-right: 8px;
+        cursor: pointer; white-space: nowrap; color: var(--txt); }
+  .tr:hover { background: var(--chrome3); }
+  .tr.sel { background: var(--accent-bg); }
+  .tr .car { width: 12px; flex: none; color: var(--txt3); font-size: 9px; text-align: center; }
+  .tr .ic { width: 13px; height: 13px; color: var(--txt3); }
+  .tr .nm { font-family: Consolas, monospace; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; }
+  .tr .d { color: var(--txt3); font-size: 10.5px; }
+  .tr.grp { color: var(--txt2); text-transform: uppercase; font-size: 10px; letter-spacing: .5px; }
+  .tr.fact .nm { color: var(--amber); }
+  .tr.dim .nm { color: var(--accent); }
+
+  /* ---------- plocha ---------- */
+  #canvas { position: relative; flex: 1; overflow: hidden; min-width: 0; background-color: var(--canvas);
+            background-image: radial-gradient(circle, #262a2f 1px, transparent 1px);
+            background-size: 20px 20px; }
+  #canvas.panning { cursor: grabbing; }
+  #canvas.linking { cursor: crosshair; }
+  #world { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+  #links { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
+  #blocks { position: absolute; top: 0; left: 0; }
+  .block { position: absolute; width: 236px; background: var(--chrome2); border: 1px solid var(--line2);
+           border-radius: 9px; box-shadow: 0 2px 6px rgba(0,0,0,.45); }
+  .block.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .block.hi { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber); }
+  .block.bad { border-color: #6b2a2a; }
+  .block.warn { border-color: #6b5a1e; }
+  .block .bh { display: flex; align-items: center; gap: 6px; padding: 6px 9px; cursor: move;
+               border-bottom: 1px solid var(--line); border-radius: 8px 8px 0 0; background: #333842; }
+  .block .bh .tn { font-family: Consolas, monospace; font-weight: 700; font-size: 12px; flex: 1;
+                   overflow: hidden; text-overflow: ellipsis; }
+  .block .bh .badge { font-size: 9px; letter-spacing: .5px; color: var(--txt3); flex: none; }
+  .block .bh .ic { width: 14px; height: 14px; color: var(--txt3); }
+  .block.fact .bh { background: #3d3524; }
+  .block.fact .bh .tn { color: var(--amber); }
+  .block.dim .bh { background: #23384d; }
+  .block.dim .bh .tn { color: var(--accent); }
+  .block.snow .bh { background: #3b2f4c; }
+  .block.snow .bh .tn { color: #cbb0e8; }
+  .block .bb { padding: 4px 0 6px; max-height: 260px; overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 6px; padding: 1px 9px; font-size: 11px;
+         font-family: Consolas, monospace; white-space: nowrap; }
+  .row .k { width: 13px; flex: none; text-align: center; color: var(--txt3); font-size: 10px; }
+  .row .n { overflow: hidden; text-overflow: ellipsis; }
+  .row .t { margin-left: auto; color: var(--txt3); font-size: 10px; flex: none; }
+  .row.mea .n { color: #ffd479; }
+  .row.key .n { color: var(--teal); }
+  .row.fk .n { color: var(--txt2); }
+  .row.sep { border-top: 1px solid var(--line); margin: 3px 0; padding: 0; height: 0; }
+  .block .more { font-size: 10px; color: var(--txt3); padding: 2px 9px; }
+  .link { fill: none; stroke: var(--teal); stroke-width: 1.6; }
+  .link.snow { stroke: var(--purple); stroke-dasharray: 6 4; }
+  .link.sel { stroke: var(--accent); stroke-width: 2.4; }
+  .link.hi { stroke: var(--amber); stroke-width: 2.2; }
+  .linkhit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
+  .linklab { fill: var(--txt3); font: 9.5px Consolas, monospace; pointer-events: none; }
+  #hintbar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px; background: var(--chrome2);
+             border: 1px solid var(--accent); border-radius: 4px; padding: 5px 12px; font-size: 11.5px;
+             color: #cfe3ff; display: none; z-index: 20; }
+  #hintbar.on { display: block; }
+  #zoombar { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 4px; align-items: center;
+             background: var(--chrome2); border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px;
+             font-size: 11px; color: var(--txt2); z-index: 15; }
+  /* ---------- minimapa ---------- */
+  #minimap { position: absolute; right: 10px; bottom: 10px; width: 196px; height: 136px;
+             background: rgba(26,29,33,.92); border: 1px solid var(--line2); border-radius: 4px;
+             z-index: 15; display: none; cursor: pointer; overflow: hidden; }
+  #minimap.on { display: block; }
+  #minimap .cap { position: absolute; left: 6px; top: 3px; font-size: 9.5px; color: var(--txt3);
+                  letter-spacing: .4px; pointer-events: none; }
+  #mmSvg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .mmb { stroke-width: 1; }
+  .mmb.fact { fill: #6a5a2c; stroke: var(--amber); }
+  .mmb.dim { fill: #2b4a6b; stroke: var(--accent); }
+  .mmb.snow { fill: #4a3a5e; stroke: var(--purple); }
+  .mmb.sel { stroke: #fff; stroke-width: 1.6; }
+  .mml { stroke: var(--teal); stroke-width: .9; opacity: .75; }
+  .mml.snow { stroke: var(--purple); stroke-dasharray: 3 2; }
+  #mmView { fill: rgba(76,154,255,.14); stroke: var(--accent); stroke-width: 1; }
+
+  /* ---------- pohled SQL ---------- */
+  #sql, #lin, #dop { flex: 1; min-width: 0; display: none; flex-direction: column; background: var(--canvas); }
+  #sql.on, #lin.on, #dop.on { display: flex; }
+  /* ---------- dopadová analýza ---------- */
+  #dopBody { flex: 1; overflow: auto; padding: 12px 14px; }
+  .dopitem { border: 1px solid var(--line); border-radius: 4px; margin-bottom: 7px; background: var(--chrome); }
+  .dopitem > .hd { display: flex; align-items: center; gap: 9px; padding: 6px 9px; cursor: pointer;
+                   user-select: none; }
+  .dopitem > .hd:hover { background: var(--chrome2); }
+  .dopitem > .hd .car { width: 11px; color: var(--txt3); font-size: 9px; }
+  .dopitem > .hd .nm { font-family: Consolas, monospace; font-size: 12px; }
+  .dopitem > .hd .kd { font-size: 10.5px; color: var(--txt3); }
+  .dopitem.fact > .hd .nm { color: var(--amber); }
+  .dopitem.dim > .hd .nm { color: var(--accent); }
+  .dopitem.link > .hd .nm { color: var(--teal); }
+  .dopitem.measure > .hd .nm, .dopitem.attr > .hd .nm { color: var(--txt); }
+  .dopitem > .bd { padding: 2px 10px 10px 30px; }
+  .dopitem > .bd.off { display: none; }
+  .znak { flex: none; font-size: 10px; letter-spacing: .3px; padding: 1px 7px; border-radius: 9px; }
+  .znak.err { background: #3a1f1f; color: var(--red); }
+  .znak.warn { background: #332b18; color: var(--amber); }
+  .znak.ok { background: #1f2f22; color: var(--green); }
+  .dopline { font-size: 11.5px; line-height: 1.55; padding: 3px 0 3px 12px; border-left: 2px solid; }
+  .dopline.err { border-color: var(--red); }
+  .dopline.warn { border-color: var(--amber); }
+  .dopline.info { border-color: var(--teal); color: var(--txt2); }
+  /* ---------- linie dat ---------- */
+  #linBody { flex: 1; overflow: auto; padding: 12px 14px; }
+  .lintab { border: 1px solid var(--line); border-radius: 4px; margin-bottom: 10px; background: var(--chrome); }
+  .lintab > .hd { display: flex; align-items: center; gap: 8px; padding: 6px 9px; background: var(--chrome2);
+                  border-bottom: 1px solid var(--line); }
+  .lintab > .hd .nm { font-family: Consolas, monospace; font-size: 12px; }
+  .lintab.fact > .hd .nm { color: var(--amber); }
+  .lintab.dim > .hd .nm { color: var(--accent); }
+  .lintab > .hd .n { font-size: 10.5px; color: var(--txt3); }
+  .lintab > .hd input[type=text] { width: 190px; }
+  .lingrid { border-collapse: collapse; width: 100%; font-size: 11.5px; }
+  .lingrid th { background: var(--chrome2); color: var(--txt2); font-size: 10px; font-weight: 600;
+                text-transform: uppercase; letter-spacing: .3px; padding: 4px 8px; text-align: left;
+                border-bottom: 1px solid var(--line); }
+  .lingrid td { border-bottom: 1px solid var(--line); padding: 2px 8px; vertical-align: middle; }
+  .lingrid tr:last-child td { border-bottom: none; }
+  .lingrid tr:hover > td { background: rgba(255,255,255,.035); }
+  .lingrid .cil { font-family: Consolas, monospace; color: var(--teal); white-space: nowrap; }
+  .lingrid .sip { color: var(--txt3); text-align: center; width: 24px; }
+  .lingrid td input[type=text] { border: none; background: transparent; padding: 3px 5px;
+                                 font-family: Consolas, monospace; font-size: 11.5px; }
+  .lingrid td input[type=text]:focus { background: #1b1b1c; outline: 1px solid var(--accent);
+                                       outline-offset: -1px; }
+  .lingrid tr.chybi .cil { color: var(--amber); }
+  .lingrid tr.chybi td.sip { color: var(--amber); }
+  .linlegend { font-size: 11px; color: var(--txt2); line-height: 1.6; margin-bottom: 12px; }
+  .sqlbar { display: flex; gap: 6px; align-items: center; padding: 8px 12px; flex: none;
+            background: var(--chrome); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  #sqlArea { flex: 1; margin: 10px 12px 12px; min-height: 120px; font-family: Consolas, monospace;
+             font-size: 12px; line-height: 1.5; white-space: pre; user-select: text; }
+
+  /* ---------- panel vlastností ---------- */
+  #panel { width: 312px; flex: none; background: var(--chrome); border-left: 1px solid var(--line);
+           display: flex; flex-direction: column; min-height: 0;
+           --txt3: #8e959c; --txt2: #b2b8be; }
+  #panel.off { display: none; }
+  #panelBody { flex: 1; overflow-y: auto; padding: 0 12px 16px; }
+  #panel h2 { font-size: 13px; font-weight: 600; margin: 12px 0 2px; }
+  #panel .sub { font-size: 11px; color: var(--txt3); margin-bottom: 12px; font-family: Consolas, monospace; }
+  h3.sec { font-size: 11px; margin: 16px 0 7px; padding-bottom: 4px; border-bottom: 1px solid var(--line);
+           color: var(--txt2); text-transform: uppercase; letter-spacing: .4px; }
+  h3.sec.fold { cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  h3.sec .car { width: 10px; font-size: 9px; color: var(--txt3); }
+  label.f { display: block; font-size: 10px; color: var(--txt3); margin-bottom: 2px;
+            text-transform: uppercase; letter-spacing: .3px; }
+  input[type=text], select, textarea {
+       background: #1b1b1c; color: var(--txt); border: 1px solid var(--line); border-radius: 2px;
+       padding: 4px 6px; font-size: 12px; font-family: inherit; width: 100%; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  textarea.desc { min-height: 52px; line-height: 1.5; resize: vertical; }
+  label.ck { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--txt2);
+             cursor: pointer; white-space: nowrap; }
+  label.ck input { accent-color: var(--accent); }
+  .grid { display: grid; gap: 6px; }
+  .g2 { grid-template-columns: 1fr 1fr; }
+  .g3 { grid-template-columns: 1fr 1fr 1fr; }
+  .prow { display: flex; align-items: center; gap: 6px; min-height: 21px; padding: 0 3px;
+          cursor: pointer; border-radius: 2px; white-space: nowrap; }
+  .prow:hover { background: var(--chrome3); }
+  .prow.open { background: var(--chrome2); }
+  .prow .car { width: 11px; flex: none; color: var(--txt3); font-size: 9px; text-align: center; }
+  .prow .nm { font-family: Consolas, monospace; font-size: 11.5px; flex: 1; overflow: hidden;
+              text-overflow: ellipsis; }
+  .prow .ty { font-family: Consolas, monospace; font-size: 10.5px; color: var(--txt3); flex: none; }
+  .prow .acts { display: none; gap: 2px; flex: none; }
+  .prow:hover .acts, .prow.open .acts { display: flex; }
+  .prow .acts button { padding: 0 5px; font-size: 11px; line-height: 16px; }
+  .pdet { padding: 7px 2px 10px 8px; margin: 0 0 4px 6px; border-left: 1px solid var(--line); }
+  .pdet.off, .foldbody.off { display: none; }
+  .hint { font-size: 11px; color: var(--txt2); line-height: 1.6; }
+  .okline { font-size: 11.5px; color: var(--green); }
+  .chk { font-size: 11px; line-height: 1.5; padding: 6px 8px; border-radius: 3px; margin-bottom: 5px;
+         cursor: pointer; border-left: 3px solid; }
+  .chk.err { background: #331d1d; border-color: var(--red); }
+  .chk.warn { background: #332b18; border-color: var(--amber); }
+  .chk.info { background: #1d2b33; border-color: var(--teal); }
+  .chk .lvl { font-weight: 600; margin-right: 6px; font-size: 10px; letter-spacing: .4px; }
+  .chk.err .lvl { color: var(--red); }
+  .chk.warn .lvl { color: var(--amber); }
+  .chk.info .lvl { color: var(--teal); }
+  .listitem { padding: 6px 8px; border: 1px solid var(--line); border-radius: 2px; margin-bottom: 5px;
+              cursor: pointer; font-size: 11.5px; }
+  .listitem:hover { border-color: var(--accent); }
+  .listitem .t { font-family: Consolas, monospace; color: var(--accent); }
+  .listitem .d { color: var(--txt3); font-size: 10.5px; margin-top: 1px; }
+  .shape { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10.5px;
+           letter-spacing: .3px; }
+  .shape.star { background: #2b3a2b; color: var(--green); }
+  .shape.snow { background: #3b2f4c; color: #cbb0e8; }
+  .shape.none { background: var(--chrome2); color: var(--txt3); }
+
+  button.b { background: var(--chrome2); color: var(--txt); border: 1px solid var(--line2);
+             border-radius: 3px; padding: 5px 10px; font-size: 11.5px; cursor: pointer; font-family: inherit; }
+  button.b:hover { background: var(--chrome3); border-color: var(--accent); }
+  button.b.prim { background: var(--accent-bg); border-color: var(--accent); color: #cfe3ff; }
+  button.b.sm { padding: 2px 7px; font-size: 11px; }
+  button.b.danger:hover { border-color: var(--red); color: var(--red); }
+
+  /* ---------- stavový řádek ---------- */
+  #status { height: 22px; background: var(--chrome2); border-top: 1px solid var(--line);
+            display: flex; align-items: center; gap: 14px; padding: 0 12px; font-size: 11px; color: var(--txt2); }
+  #statusMsg.ok { color: var(--green); }
+  #statusMsg.err { color: var(--red); }
+
+  /* ---------- okno s XML ---------- */
+  #modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 50; display: none;
+           align-items: center; justify-content: center; }
+  #modal.on { display: flex; }
+  #modalbox { background: var(--chrome); border: 1px solid var(--line2); border-radius: 3px;
+              width: min(900px, 92vw); max-height: 88vh; display: flex; flex-direction: column; }
+  #modalbox h2 { font-size: 12px; font-weight: 600; padding: 8px 12px; background: var(--chrome2);
+                 border-bottom: 1px solid var(--line); text-transform: uppercase; letter-spacing: .5px; }
+  #modalbox .body { padding: 12px; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .toolbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  #xmlArea { flex: 1; min-height: 360px; font-family: Consolas, monospace; font-size: 12px;
+             line-height: 1.5; white-space: pre; user-select: text; }
+  .msg { font-size: 11.5px; color: var(--txt2); margin-top: 6px; min-height: 16px; }
+  .msg.ok { color: var(--green); }
+  .msg.err { color: var(--red); }
+</style>
+</head>
+<body>
+
+<svg style="display:none">
+  <symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 2.8 20 7v10l-8 4.2L4 17V7z"/><path d="m4 7 8 4.2L20 7M12 11.2V21"/></symbol>
+  <symbol id="i-fact" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 9v11"/><path d="M12 13h6M12 16h4"/></symbol>
+  <symbol id="i-dim" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 8h16M8 8v13"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+  <symbol id="i-cursor" viewBox="0 0 24 24"><path d="m5 3 6 17 2.5-6.5L20 11z"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M4 11h11a5 5 0 0 1 0 10h-6"/><path d="m8 7-4 4 4 4"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M20 11H9a5 5 0 0 0 0 10h6"/><path d="m16 7 4 4-4 4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-zoomin" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M11 8v6M8 11h6"/></symbol>
+  <symbol id="i-zoomout" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M8 11h6"/></symbol>
+  <symbol id="i-zoom1" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M10 8h1v6"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m8 6-5 6 5 6M16 6l5 6-5 6M13 4l-2 16"/></symbol>
+  <symbol id="i-sql" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M20 12c0 1.7-3.6 3-8 3s-8-1.3-8-3"/></symbol>
+  <symbol id="i-open" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3M8 14h8v7H8z"/></symbol>
+  <symbol id="i-example" viewBox="0 0 24 24"><path d="M5 4h9l5 5v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M14 4v5h5M8 13h8M8 17h5"/></symbol>
+  <symbol id="i-panelleft" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></symbol>
+  <symbol id="i-panelright" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></symbol>
+  <symbol id="i-collapseL" viewBox="0 0 24 24"><path d="m14 7-5 5 5 5"/><path d="M19 4v16"/></symbol>
+  <symbol id="i-collapseR" viewBox="0 0 24 24"><path d="m10 7 5 5-5 5"/><path d="M5 4v16"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></symbol>
+  <symbol id="i-cdm" viewBox="0 0 24 24"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="m8.6 10.6 6.8-3.2M8.6 13.4l6.8 3.2"/></symbol>
+  <symbol id="i-ldm" viewBox="0 0 24 24"><rect x="3" y="5" width="8" height="6" rx="1"/><rect x="13" y="13" width="8" height="6" rx="1"/><path d="M11 8h3a2 2 0 0 1 2 2v3"/></symbol>
+  <symbol id="i-pdm" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 9v11"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v14"/><path d="m6 12 6 6 6-6"/></symbol>
+  <symbol id="i-mmap" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="7" height="6" rx="1"/></symbol>
+  <symbol id="i-dop" viewBox="0 0 24 24"><path d="M12 3 3 19h18z"/><path d="M12 9v5M12 17h.01"/></symbol>
+  <symbol id="i-lin" viewBox="0 0 24 24"><rect x="2" y="3" width="6" height="4" rx="1"/><rect x="2" y="10" width="6" height="4" rx="1"/><rect x="2" y="17" width="6" height="4" rx="1"/><rect x="16" y="10" width="6" height="4" rx="1"/><path d="M8 5h4v7h4M8 12h8M8 19h4v-7"/></symbol>
+</svg>
+
+<div id="titlebar">
+  <div class="logo">TORM <b>Cubes</b></div>
+  <div class="qat">
+    <button class="qb" id="btnUndo" title="Zpět (Ctrl+Z)"><svg class="ic"><use href="#i-undo"/></svg></button>
+    <button class="qb" id="btnRedo" title="Vpřed (Ctrl+Y)"><svg class="ic"><use href="#i-redo"/></svg></button>
+  </div>
+  <div class="tabs">
+    <button class="rt act" data-rtab="home">Domů</button>
+    <button class="rt" data-rtab="view">Zobrazení</button>
+    <button class="rt" data-rtab="data">Data</button>
+  </div>
+  <div class="spacer"></div>
+  <button class="qb" id="btnRibbon" title="Sbalit / rozbalit pás karet"><svg class="ic"><use href="#i-chev"/></svg></button>
+</div>
+
+<div id="ribbon">
+  <div class="rpage act" data-rpage="home">
+    <div class="rgroup">
+      <button class="rbig" id="btnAddFact" title="Vložit tabulku faktů (měřítka)">
+        <svg class="ic24"><use href="#i-fact"/></svg><span>Nový<br>fakt</span></button>
+      <button class="rbig" id="btnAddDim" title="Vložit dimenzi (podle čeho se řeže)">
+        <svg class="ic24"><use href="#i-dim"/></svg><span>Nová<br>dimenze</span></button>
+      <div class="rcap">Stavební kameny</div>
+    </div>
+    <div class="rgroup">
+      <button class="rbig" data-mode="link" title="Napojit fakt na dimenzi, nebo dimenzi na nadřazenou dimenzi">
+        <svg class="ic24"><use href="#i-link"/></svg><span>Napojit</span></button>
+      <div class="rcol">
+        <button class="rsm act" data-mode="select" title="Režim výběru a posunu (Esc)">
+          <svg class="ic"><use href="#i-cursor"/></svg><span>Výběr</span></button>
+        <button class="rsm" id="btnDelSel" title="Smazat vybraný prvek (Delete)">
+          <svg class="ic"><use href="#i-trash"/></svg><span>Smazat</span></button>
+      </div>
+      <div class="rcap">Vazby</div>
+    </div>
+    <div class="rgroup">
+      <div class="rcol">
+        <button class="rsm" id="btnUndo2" title="Zpět (Ctrl+Z)">
+          <svg class="ic"><use href="#i-undo"/></svg><span>Zpět</span></button>
+        <button class="rsm" id="btnRedo2" title="Vpřed (Ctrl+Y)">
+          <svg class="ic"><use href="#i-redo"/></svg><span>Vpřed</span></button>
+      </div>
+      <div class="rcap">Úpravy</div>
+    </div>
+    <div class="rgroup">
+      <div class="rcol">
+        <button class="rsm" data-level="cdm" title="Konceptuální model — čím se zabýváme, bez techniky">
+          <svg class="ic"><use href="#i-cdm"/></svg><span>CDM konceptuální</span></button>
+        <button class="rsm act" data-level="ldm" title="Logický model — entity, klíče, atributy, logické typy">
+          <svg class="ic"><use href="#i-ldm"/></svg><span>LDM logický</span></button>
+        <button class="rsm" data-level="pdm" title="Fyzický model — tabulky, sloupce, typy zvolené databáze">
+          <svg class="ic"><use href="#i-pdm"/></svg><span>PDM fyzický</span></button>
+      </div>
+      <div class="rcap">Úroveň modelu</div>
+    </div>
+    <div class="rgroup">
+      <div class="rcol">
+        <button class="rsm" id="btnGenLdm" title="Z konceptů odvodit entity, klíče a atributy">
+          <svg class="ic"><use href="#i-down"/></svg><span>CDM → LDM</span></button>
+        <button class="rsm" id="btnGenPdm" title="Z logického modelu odvodit tabulky, sloupce a typy">
+          <svg class="ic"><use href="#i-down"/></svg><span>LDM → PDM</span></button>
+        <button class="rsm" id="btnGenAll" title="Odvodit obojí najednou">
+          <svg class="ic"><use href="#i-down"/></svg><span>Vše najednou</span></button>
+      </div>
+      <div class="rcap">Odvodit o úroveň níž</div>
+    </div>
+    <div class="rgroup">
+      <button class="rbig" id="btnChecks" title="Kontroly modelu">
+        <svg class="ic24"><use href="#i-check"/></svg><span id="chkLabel">Kontroly</span></button>
+      <div class="rcap">Kontrola</div>
+    </div>
+    <div class="rgroup">
+      <div class="rcol" style="justify-content:center;height:56px">
+        <div style="font-size:11px;color:var(--txt2);padding:0 6px">Tvar modelu</div>
+        <div style="padding:4px 6px"><span class="shape none" id="shapeBadge">prázdný</span></div>
+      </div>
+      <div class="rcap">Hvězda / vločka</div>
+    </div>
+  </div>
+
+  <div class="rpage" data-rpage="view">
+    <div class="rgroup">
+      <button class="rbig" id="btnLayout" title="Srovnat: fakty doprostřed, dimenze kolem">
+        <svg class="ic24"><use href="#i-grid"/></svg><span>Srovnat</span></button>
+      <button class="rbig" id="btnFit" title="Zobrazit celý model">
+        <svg class="ic24"><use href="#i-fit"/></svg><span>Vycentrovat</span></button>
+      <div class="rcap">Rozvržení</div>
+    </div>
+    <div class="rgroup">
+      <div class="rcol">
+        <button class="rsm" id="zIn"><svg class="ic"><use href="#i-zoomin"/></svg><span>Přiblížit</span></button>
+        <button class="rsm" id="zOut"><svg class="ic"><use href="#i-zoomout"/></svg><span>Oddálit</span></button>
+        <button class="rsm" id="zReset"><svg class="ic"><use href="#i-zoom1"/></svg><span>100 %</span></button>
+      </div>
+      <div class="rcap">Přiblížení</div>
+    </div>
+    <div class="rgroup">
+      <div class="rcol">
+        <button class="rsm act" id="btnBrowser"><svg class="ic"><use href="#i-panelleft"/></svg><span>Prohlížeč</span></button>
+        <button class="rsm act" id="btnPanel"><svg class="ic"><use href="#i-panelright"/></svg><span>Vlastnosti</span></button>
+        <button class="rsm act" id="btnMinimap" title="Minimapa v pravém dolním rohu plochy">
+          <svg class="ic"><use href="#i-mmap"/></svg><span>Minimapa</span></button>
+      </div>
+      <div class="rcap">Panely</div>
+    </div>
+  </div>
+
+  <div class="rpage" data-rpage="data">
+    <div class="rgroup">
+      <button class="rbig" id="btnXml" title="Otevřít okno s XML definicí kostky">
+        <svg class="ic24"><use href="#i-code"/></svg><span>XML<br>kostky</span></button>
+      <div class="rcol">
+        <button class="rsm" id="btnOpen2"><svg class="ic"><use href="#i-open"/></svg><span>Otevřít…</span></button>
+        <button class="rsm" id="btnSave2"><svg class="ic"><use href="#i-save"/></svg><span>Uložit</span></button>
+        <button class="rsm" id="btnExample2"><svg class="ic"><use href="#i-example"/></svg><span>Ukázka</span></button>
+      </div>
+      <div class="rcap">XML</div>
+    </div>
+    <div class="rgroup">
+      <button class="rbig" id="btnSqlTool" title="Vygenerovat SQL: tabulky, cizí klíče a ukázkový dotaz">
+        <svg class="ic24"><use href="#i-sql"/></svg><span>SQL<br>skript</span></button>
+      <div class="rcap">SQL</div>
+    </div>
+  </div>
+</div>
+
+<div id="main">
+  <div id="rail">
+    <button class="tool-b act" data-tool="cube" title="KOSTKA — plocha s fakty a dimenzemi">
+      <svg class="ic"><use href="#i-cube"/></svg><span>KOSTKA</span></button>
+    <button class="tool-b" data-tool="lin" title="LINIE — odkud se každý sloupec kostky bere">
+      <svg class="ic"><use href="#i-lin"/></svg><span>LINIE</span></button>
+    <button class="tool-b" data-tool="dop" title="DOPAD — co se rozbije, když se něco smaže">
+      <svg class="ic"><use href="#i-dop"/></svg><span>DOPAD</span></button>
+    <button class="tool-b" data-tool="sql" title="SQL — tabulky, klíče a ukázkový dotaz">
+      <svg class="ic"><use href="#i-sql"/></svg><span>SQL</span></button>
+    <div class="spacer"></div>
+    <button class="rail-b" id="btnAccount" title="O aplikaci"><svg class="ic"><use href="#i-user"/></svg></button>
+    <button class="rail-b" id="btnSettings" title="Nastavení"><svg class="ic"><use href="#i-gear"/></svg></button>
+    <div class="pop" id="popAccount">
+      <h4>O aplikaci</h4>
+      <div class="note">TORM Cubes běží <b>místně</b> v prohlížeči — nic se nikam neodesílá.
+        Model je jeden XML soubor, rozmístění bloků si pamatuje tenhle prohlížeč.</div>
+      <button class="b" id="btnClearLayout" style="width:100%">Vymazat uložené rozmístění</button>
+    </div>
+    <div class="pop" id="popSettings">
+      <h4>Projekt</h4>
+      <label class="f">Databáze (vendor)</label>
+      <select id="setVendor">
+        <option value="oracle">Oracle</option>
+        <option value="postgresql">PostgreSQL</option>
+        <option value="mysql">MySQL</option>
+        <option value="mssql">Microsoft SQL Server</option>
+      </select>
+      <div class="note" style="margin-top:6px">Ovlivní datové typy ve vygenerovaném SQL.</div>
+      <h4 style="margin-top:10px">Zobrazení</h4>
+      <label class="row2"><input type="checkbox" id="setGrid" checked> Mřížka plochy</label>
+      <label class="row2"><input type="checkbox" id="setTypes" checked> Datové typy v blocích</label>
+      <label class="row2"><input type="checkbox" id="setMinimap" checked> Minimapa plochy</label>
+    </div>
+  </div>
+
+  <button class="stub" id="stubBrowser" title="Zobrazit prohlížeč modelu"><svg class="ic"><use href="#i-collapseR"/></svg></button>
+
+  <aside id="browser">
+    <div class="phead">Prohlížeč kostky<span class="spacer"></span>
+      <button class="pbtn" id="btnBrowserHide" title="Skrýt panel"><svg class="ic"><use href="#i-collapseL"/></svg></button>
+    </div>
+    <div class="tree" id="tree"></div>
+  </aside>
+
+  <div id="canvas">
+    <div id="world">
+      <svg id="links"><g id="linkg"></g></svg>
+      <div id="blocks"></div>
+    </div>
+    <div id="hintbar"></div>
+    <div id="zoombar">
+      <button class="b sm" id="zOut2">−</button><span id="zVal">100 %</span>
+      <button class="b sm" id="zIn2">+</button><button class="b sm" id="zReset2">100 %</button>
+    </div>
+    <div id="minimap" title="Klepnutím nebo tažením se plocha přesune">
+      <svg id="mmSvg"><g id="mmG"></g><rect id="mmView" x="0" y="0" width="0" height="0"/></svg>
+      <span class="cap">MINIMAPA</span>
+    </div>
+  </div>
+
+  <div id="dop">
+    <div class="sqlbar">
+      <input type="text" id="dopFilter" placeholder="Hledat prvek…" style="width:190px">
+      <label class="ck"><input type="checkbox" id="dopOnlyRisk" checked> Jen s dopadem</label>
+      <label class="ck"><input type="checkbox" id="dopSort" checked> Nejrizikovější nahoře</label>
+      <div class="spacer"></div>
+      <span class="hint" id="dopInfo"></span>
+    </div>
+    <div id="dopBody"></div>
+  </div>
+
+  <div id="lin">
+    <div class="sqlbar">
+      <input type="text" id="linFilter" placeholder="Hledat tabulku nebo sloupec…" style="width:210px">
+      <label class="ck"><input type="checkbox" id="linOnlyMissing"> Jen nedoplněné</label>
+      <button class="b" id="btnLinSchema">📂 Načíst zdrojové schéma…</button>
+      <input type="file" id="fileSchema" accept=".xml" style="display:none">
+      <div class="spacer"></div>
+      <span class="hint" id="linInfo"></span>
+    </div>
+    <div id="linBody"></div>
+  </div>
+
+  <div id="sql">
+    <div class="sqlbar">
+      <button class="b prim" id="btnSqlGen">⟳ Vygenerovat</button>
+      <label class="ck"><input type="checkbox" id="sqlDrop"> DROP na začátku</label>
+      <label class="ck"><input type="checkbox" id="sqlFks" checked> Cizí klíče</label>
+      <label class="ck"><input type="checkbox" id="sqlQuery" checked> Ukázkový dotaz</label>
+      <label class="ck"><input type="checkbox" id="sqlLoad"> Načítací skript z linie</label>
+      <div class="spacer"></div>
+      <button class="b" id="btnSqlCopy">Kopírovat</button>
+      <button class="b" id="btnSqlDown">Stáhnout .sql</button>
+    </div>
+    <textarea id="sqlArea" spellcheck="false"></textarea>
+  </div>
+
+  <div id="panel">
+    <div class="phead"><span id="phTitle">Vlastnosti</span><span class="spacer"></span>
+      <button class="pbtn" id="btnPanelHide" title="Skrýt panel"><svg class="ic"><use href="#i-collapseR"/></svg></button>
+    </div>
+    <div id="panelBody"></div>
+    <datalist id="zdrojeTab"></datalist>
+    <datalist id="zdrojeSl"></datalist>
+  </div>
+
+  <button class="stub" id="stubPanel" title="Zobrazit panel vlastností"><svg class="ic"><use href="#i-collapseL"/></svg></button>
+</div>
+
+<div id="status">
+  <span id="statusMsg">Připraveno</span>
+  <span class="spacer"></span>
+  <span id="statusSel"></span>
+  <span id="statusInfo"></span>
+</div>
+
+<div id="modal">
+  <div id="modalbox">
+    <h2>XML kostky</h2>
+    <div class="body">
+      <div class="toolbar">
+        <button class="b prim" id="btnGen">⟳ Vygenerovat z plochy</button>
+        <button class="b" id="btnLoad">⤓ Načíst do plochy</button>
+        <button class="b" onclick="document.getElementById('fileXml').click()">📂 Otevřít soubor…</button>
+        <input type="file" id="fileXml" accept=".xml" style="display:none">
+        <button class="b" id="btnDown">💾 Stáhnout</button>
+        <button class="b" id="btnCopy">Kopírovat</button>
+        <button class="b" id="btnExample">Ukázka</button>
+        <div class="spacer"></div>
+        <button class="b" id="btnClose">✕ Zavřít</button>
+      </div>
+      <textarea id="xmlArea" spellcheck="false"></textarea>
+      <div class="msg" id="xmlMsg"></div>
+    </div>
+  </div>
+</div>
+
+<script type="text/plain" id="exampleXml">
+<?xml version="1.0" encoding="UTF-8"?>
+<cube-model xmlns="http://dbgen.cube/1.0" version="1.0">
+
+    <metadata>
+        <name>Prodej</name>
+        <created>2026-09-09</created>
+    </metadata>
+
+    <database>
+        <vendor>oracle</vendor>
+    </database>
+
+    <dimensions>
+        <dimension concept="Čas" name="DIM_DATUM" table="DIM_DATUM" source-table="KALENDAR" key="DATUM_ID" key-type="integer">
+            <key-source table="KALENDAR" column="ID"/>
+            <description>Kalendář. Nejjemnější úroveň je den.</description>
+            <attribute concept="Den" name="DEN" column="DEN" type="date"><source column="DATUM"/></attribute>
+            <attribute concept="Měsíc" name="MESIC" column="MESIC" type="integer"/>
+            <attribute concept="Čtvrtletí" name="CTVRTLETI" column="CTVRTLETI" type="integer"/>
+            <attribute concept="Rok" name="ROK" column="ROK" type="integer"><source expr="EXTRACT(YEAR FROM KALENDAR.DATUM)"/></attribute>
+            <hierarchy name="Kalendar">
+                <level>ROK</level>
+                <level>CTVRTLETI</level>
+                <level>MESIC</level>
+                <level>DEN</level>
+            </hierarchy>
+        </dimension>
+        <dimension concept="Zboží" name="DIM_ZBOZI" table="DIM_ZBOZI" source-table="PRODUKT" key="ZBOZI_ID" key-type="integer">
+            <key-source table="PRODUKT" column="ID"/>
+            <description>Prodávané zboží. Kategorie je vlastní tabulka - proto vločka.</description>
+            <attribute concept="Název zboží" name="NAZEV" column="NAZEV" type="string"><source column="NAZEV"/></attribute>
+            <attribute concept="Katalogový kód" name="KOD" column="KOD" type="string"/>
+        </dimension>
+        <dimension concept="Kategorie zboží" name="DIM_KATEGORIE" table="DIM_KATEGORIE" key="KATEGORIE_ID" key-type="integer">
+            <description>Nadřazená úroveň zboží. Vytahuje vločku o patro dál.</description>
+            <attribute concept="Název kategorie" name="NAZEV" column="NAZEV" type="string"/>
+        </dimension>
+        <dimension concept="Prodejna" name="DIM_PRODEJNA" table="DIM_PRODEJNA" key="PRODEJNA_ID" key-type="integer">
+            <description>Kde se prodalo.</description>
+            <attribute concept="Název prodejny" name="NAZEV" column="NAZEV" type="string"/>
+            <attribute concept="Město" name="MESTO" column="MESTO" type="string"/>
+        </dimension>
+    </dimensions>
+
+    <facts>
+        <fact concept="Prodej" name="FAKT_PRODEJ" table="FAKT_PRODEJ" source-table="UCTENKA_POLOZKA">
+            <description>Položky účtenek.</description>
+            <grain>jeden řádek = jedna položka na jedné účtence</grain>
+            <measure concept="Množství" name="MNOZSTVI" column="MNOZSTVI" agg="SUM" type="integer">
+                <description>Kolik kusů se prodalo.</description>
+                <source column="MNOZSTVI"/>
+            </measure>
+            <measure concept="Tržba" name="TRZBA" column="TRZBA" agg="SUM" type="money">
+                <description>Cena za položku včetně DPH.</description>
+                <source expr="MNOZSTVI * CENA_KS"/>
+            </measure>
+            <measure concept="Počet účtenek" name="POCET_UCTENEK" column="UCTENKA_ID" agg="COUNT DISTINCT" type="integer">
+                <description>Kolik různých účtenek. Nesčítá se, počítá se ze základu.</description>
+            </measure>
+        </fact>
+    </facts>
+
+    <links>
+        <link from="FAKT_PRODEJ" to="DIM_DATUM" column="DATUM_ID" concept="kdy se prodalo"/>
+        <link from="FAKT_PRODEJ" to="DIM_ZBOZI" column="ZBOZI_ID" concept="co se prodalo"/>
+        <link from="FAKT_PRODEJ" to="DIM_PRODEJNA" column="PRODEJNA_ID" concept="kde se prodalo"/>
+        <link from="DIM_ZBOZI" to="DIM_KATEGORIE" column="KATEGORIE_ID" concept="patří do kategorie"/>
+    </links>
+
+</cube-model>
+</script>
+
+<script>
+"use strict";
+const NS_CUBE = "http://dbgen.cube/1.0";
+const EXAMPLE = document.getElementById("exampleXml").textContent.trim();
+const $ = id => document.getElementById(id);
+const LS_KEY = "tormCubesLayout", SET_KEY = "tormCubesSettings";
+
+/* ==================== Model ==================== */
+/* Kostka = jedna nebo víc tabulek faktů (co měřím) obklopených dimenzemi (podle čeho to řežu).
+   Když dimenze ukazuje na další dimenzi, je z hvězdy vločka. */
+function emptyModel() {
+  return { name: "Nová kostka", created: new Date().toISOString().slice(0, 10),
+           vendor: "oracle", facts: [], dims: [], links: [] };
+}
+const AGGS = ["SUM", "COUNT", "COUNT DISTINCT", "AVG", "MIN", "MAX"];
+const TYPES = [
+  { t: "integer",  o: "NUMBER(10)",    p: "INTEGER",       m: "INT",           s: "INT" },
+  { t: "long",     o: "NUMBER(19)",    p: "BIGINT",        m: "BIGINT",        s: "BIGINT" },
+  { t: "decimal",  o: "NUMBER(15,2)",  p: "NUMERIC(15,2)", m: "DECIMAL(15,2)", s: "DECIMAL(15,2)" },
+  { t: "money",    o: "NUMBER(12,2)",  p: "NUMERIC(12,2)", m: "DECIMAL(12,2)", s: "DECIMAL(12,2)" },
+  { t: "string",   o: "VARCHAR2(100)", p: "VARCHAR(100)",  m: "VARCHAR(100)",  s: "NVARCHAR(100)" },
+  { t: "date",     o: "DATE",          p: "DATE",          m: "DATE",          s: "DATE" },
+  { t: "datetime", o: "TIMESTAMP",     p: "TIMESTAMP",     m: "DATETIME",      s: "DATETIME2" },
+  { t: "boolean",  o: "CHAR(1)",       p: "BOOLEAN",       m: "TINYINT(1)",    s: "BIT" }
+];
+const VENDOR_COL = { oracle: "o", postgresql: "p", mysql: "m", mssql: "s" };
+function sqlType(t) {
+  const d = TYPES.filter(x => x.t === t)[0];
+  return d ? d[VENDOR_COL[model.vendor] || "o"] : "/* doplňte typ */";
+}
+/* Každý prvek nese jméno na všech třech úrovních:
+   concept = jak se tomu říká v byznysu (CDM), name/type = logický model (LDM),
+   column/table + sqlType = fyzický model (PDM). Prázdné pole se odvodí z úrovně nad ním. */
+/* src = odkud se hodnota bere: zdrojová tabulka, sloupec a případný výraz místo sloupce */
+function newSrc() { return { table: "", column: "", expr: "" }; }
+function newMeasure(n, popis) {
+  return { concept: popis || n, name: n, column: n, agg: "SUM", type: "decimal", sqlType: "",
+           src: newSrc(), description: "" };
+}
+function newAttr(n, popis) {
+  return { concept: popis || n, name: n, column: n, type: "string", sqlType: "",
+           src: newSrc(), description: "" };
+}
+/** Zdroj sloupce: vlastní tabulka, jinak výchozí zdroj celé entity. */
+function srcOf(n, x) {
+  const s = x.src || newSrc();
+  return { table: s.table || n.sourceTable || "", column: s.column || "", expr: s.expr || "" };
+}
+function srcText(n, x) {
+  const s = srcOf(n, x);
+  if (s.expr) return s.expr;
+  if (!s.column) return "";
+  return (s.table ? s.table + "." : "") + s.column;
+}
+function newFact(name, concept) {
+  return { concept: concept || name, name: name, table: name, sourceTable: "", description: "", grain: "",
+           measures: [Object.assign(newMeasure("MNOZSTVI", "Množství"), { type: "integer" })] };
+}
+function newDim(name, concept) {
+  const zaklad = name.replace(/^DIM_/, "") || "DIM";
+  return { concept: concept || name, name: name, table: name, sourceTable: "",
+           key: zaklad + "_ID", keyType: "integer", keySqlType: "", keySrc: newSrc(),
+           description: "", attributes: [newAttr("NAZEV", "Název")], hierarchies: [] };
+}
+
+/* ---- převod byznysového názvu na technický: bez diakritiky, velká písmena, podtržítka ---- */
+const DIA = { "á":"a","č":"c","ď":"d","é":"e","ě":"e","í":"i","ň":"n","ó":"o","ř":"r","š":"s",
+              "ť":"t","ú":"u","ů":"u","ý":"y","ž":"z" };
+function technicalize(s) {
+  return String(s || "").toLowerCase().replace(/[áčďéěíňóřšťúůýž]/g, z => DIA[z] || z)
+    .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").toUpperCase();
+}
+/** Fyzický typ: buď ruční přepis, nebo odvozený z logického typu podle vendoru. */
+function physType(x, logicky) { return (x && x.sqlType) || sqlType(logicky); }
+
+let model = emptyModel();
+let pos = {};                 // název bloku → {x,y}
+let sel = null;               // {kind:"fact"|"dim"|"link", idx}
+let settings = { grid: true, types: true, minimap: true };
+let level = "ldm";            // cdm = konceptuální, ldm = logický, pdm = fyzický
+
+const LEVELS = {
+  cdm: { nazev: "CDM — konceptuální",
+         popis: "Čím se zabýváme, řečeno jazykem byznysu. Žádné tabulky, klíče ani typy — " +
+                "jen <b>co měříme</b> a <b>podle čeho to sledujeme</b>. Tohle je řeč, kterou mluví zadavatel." },
+  ldm: { nazev: "LDM — logický",
+         popis: "Entity, klíče, atributy a logické typy. Pořád nezávislé na databázi — " +
+                "říká <b>co v modelu je</b>, ne jak se to uloží." },
+  pdm: { nazev: "PDM — fyzický",
+         popis: "Tabulky, sloupce a typy konkrétní databáze, primární a cizí klíče. " +
+                "Z téhle úrovně se generuje SQL." }
+};
+function isC() { return level === "cdm"; }
+function isP() { return level === "pdm"; }
+/** Popisek prvku na aktuální úrovni — na CDM byznysový, jinak technický. */
+function labelOf(x, fyz) {
+  if (isC()) return x.concept || x.name || "";
+  if (isP()) return (fyz ? x[fyz] : x.table) || x.name || "";
+  return x.name || x.concept || "";
+}
+
+function factByName(n) { return model.facts.filter(f => f.name === n)[0]; }
+function dimByName(n) { return model.dims.filter(d => d.name === n)[0]; }
+function nodeByName(n) { return factByName(n) || dimByName(n); }
+function isFact(n) { return !!factByName(n); }
+function allNames() { return model.facts.map(f => f.name).concat(model.dims.map(d => d.name)); }
+function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                        .replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+/* ==================== Načtení a zápis XML ==================== */
+function ch(el, name) { return Array.from(el.children).filter(c => c.localName === name); }
+function txt(el, name) { const c = ch(el, name)[0]; return c ? c.textContent.trim() : ""; }
+function at(el, name) { return el.getAttribute(name) || ""; }
+/** <source table="..." column="..." expr="..."/> uvnitř atributu, měřítka nebo klíče. */
+function readSrc(el) {
+  const s = ch(el, "source")[0];
+  return s ? { table: at(s, "table"), column: at(s, "column"), expr: at(s, "expr") } : newSrc();
+}
+function srcXml(odsazeni, s) {
+  if (!s || (!s.table && !s.column && !s.expr)) return null;
+  return odsazeni + "<source" + (s.table ? ' table="' + esc(s.table) + '"' : "") +
+    (s.column ? ' column="' + esc(s.column) + '"' : "") +
+    (s.expr ? ' expr="' + esc(s.expr) + '"' : "") + "/>";
+}
+
+function parseXml(text) {
+  const doc = new DOMParser().parseFromString(text, "text/xml");
+  if (doc.querySelector("parsererror"))
+    throw new Error("XML není validní: " + doc.querySelector("parsererror").textContent.split("\n")[0]);
+  const root = doc.documentElement;
+  if (root.localName !== "cube-model")
+    throw new Error("Kořenový element musí být <cube-model>, našel jsem <" + root.localName + ">.");
+  const m = emptyModel();
+  const meta = ch(root, "metadata")[0];
+  if (meta) { m.name = txt(meta, "name") || m.name; m.created = txt(meta, "created") || m.created; }
+  const db = ch(root, "database")[0];
+  if (db) m.vendor = txt(db, "vendor") || m.vendor;
+
+  const dimsEl = ch(root, "dimensions")[0];
+  if (dimsEl) for (const d of ch(dimsEl, "dimension")) {
+    const dm = { concept: at(d, "concept") || at(d, "name"), name: at(d, "name"),
+                 table: at(d, "table") || at(d, "name"),
+                 sourceTable: at(d, "source-table"),
+                 key: at(d, "key"), keyType: at(d, "key-type") || "integer",
+                 keySqlType: at(d, "key-sql-type"), keySrc: newSrc(),
+                 description: txt(d, "description"), attributes: [], hierarchies: [] };
+    const kl = ch(d, "key-source")[0];
+    if (kl) dm.keySrc = { table: at(kl, "table"), column: at(kl, "column"), expr: at(kl, "expr") };
+    for (const a of ch(d, "attribute"))
+      dm.attributes.push({ concept: at(a, "concept") || at(a, "name"), name: at(a, "name"),
+                           column: at(a, "column") || at(a, "name"),
+                           type: at(a, "type") || "string", sqlType: at(a, "sql-type"),
+                           src: readSrc(a), description: txt(a, "description") });
+    for (const h of ch(d, "hierarchy"))
+      dm.hierarchies.push({ name: at(h, "name"), levels: ch(h, "level").map(l => l.textContent.trim()) });
+    m.dims.push(dm);
+  }
+  const factsEl = ch(root, "facts")[0];
+  if (factsEl) for (const f of ch(factsEl, "fact")) {
+    const fm = { concept: at(f, "concept") || at(f, "name"), name: at(f, "name"),
+                 table: at(f, "table") || at(f, "name"), sourceTable: at(f, "source-table"),
+                 description: txt(f, "description"), grain: txt(f, "grain"), measures: [] };
+    for (const me of ch(f, "measure"))
+      fm.measures.push({ concept: at(me, "concept") || at(me, "name"), name: at(me, "name"),
+                         column: at(me, "column") || at(me, "name"),
+                         agg: at(me, "agg") || "SUM", type: at(me, "type") || "decimal",
+                         sqlType: at(me, "sql-type"), src: readSrc(me),
+                         description: txt(me, "description") });
+    m.facts.push(fm);
+  }
+  const linksEl = ch(root, "links")[0];
+  if (linksEl) for (const l of ch(linksEl, "link"))
+    m.links.push({ from: at(l, "from"), to: at(l, "to"), column: at(l, "column"),
+                   concept: at(l, "concept"), src: readSrc(l) });
+  return m;
+}
+
+function serializeModel(m) {
+  const L = [];
+  L.push('<?xml version="1.0" encoding="UTF-8"?>');
+  L.push('<cube-model xmlns="' + NS_CUBE + '" version="1.0">');
+  L.push("");
+  L.push("    <metadata>");
+  L.push("        <name>" + esc(m.name) + "</name>");
+  L.push("        <created>" + esc(m.created) + "</created>");
+  L.push("    </metadata>");
+  L.push("");
+  L.push("    <database>");
+  L.push("        <vendor>" + esc(m.vendor) + "</vendor>");
+  L.push("    </database>");
+  L.push("");
+  L.push("    <dimensions>");
+  const kon = x => x.concept && x.concept !== x.name ? ' concept="' + esc(x.concept) + '"' : "";
+  for (const d of m.dims) {
+    L.push('        <dimension' + kon(d) + ' name="' + esc(d.name) + '" table="' + esc(d.table) +
+           '"' + (d.sourceTable ? ' source-table="' + esc(d.sourceTable) + '"' : "") +
+           ' key="' + esc(d.key) + '" key-type="' + esc(d.keyType) + '"' +
+           (d.keySqlType ? ' key-sql-type="' + esc(d.keySqlType) + '"' : "") + ">");
+    if (d.description) L.push("            <description>" + esc(d.description) + "</description>");
+    const ks = srcXml("            ", d.keySrc);
+    if (ks) L.push(ks.replace("<source", "<key-source"));
+    for (const a of d.attributes) {
+      const hlava = '            <attribute' + kon(a) + ' name="' + esc(a.name) + '" column="' +
+                    esc(a.column) + '" type="' + esc(a.type) + '"' +
+                    (a.sqlType ? ' sql-type="' + esc(a.sqlType) + '"' : "");
+      const zdroj = srcXml("                ", a.src);
+      if (a.description || zdroj) {
+        L.push(hlava + ">");
+        if (a.description) L.push("                <description>" + esc(a.description) + "</description>");
+        if (zdroj) L.push(zdroj);
+        L.push("            </attribute>");
+      } else L.push(hlava + "/>");
+    }
+    for (const h of d.hierarchies) {
+      L.push('            <hierarchy name="' + esc(h.name) + '">');
+      for (const lv of h.levels) L.push("                <level>" + esc(lv) + "</level>");
+      L.push("            </hierarchy>");
+    }
+    L.push("        </dimension>");
+  }
+  L.push("    </dimensions>");
+  L.push("");
+  L.push("    <facts>");
+  for (const f of m.facts) {
+    L.push('        <fact' + kon(f) + ' name="' + esc(f.name) + '" table="' + esc(f.table) + '"' +
+           (f.sourceTable ? ' source-table="' + esc(f.sourceTable) + '"' : "") + ">");
+    if (f.description) L.push("            <description>" + esc(f.description) + "</description>");
+    if (f.grain) L.push("            <grain>" + esc(f.grain) + "</grain>");
+    for (const me of f.measures) {
+      const hlava = '            <measure' + kon(me) + ' name="' + esc(me.name) + '" column="' +
+                    esc(me.column) + '" agg="' + esc(me.agg) + '" type="' + esc(me.type) + '"' +
+                    (me.sqlType ? ' sql-type="' + esc(me.sqlType) + '"' : "");
+      const zdroj = srcXml("                ", me.src);
+      if (me.description || zdroj) {
+        L.push(hlava + ">");
+        if (me.description) L.push("                <description>" + esc(me.description) + "</description>");
+        if (zdroj) L.push(zdroj);
+        L.push("            </measure>");
+      } else L.push(hlava + "/>");
+    }
+    L.push("        </fact>");
+  }
+  L.push("    </facts>");
+  L.push("");
+  L.push("    <links>");
+  for (const l of m.links) {
+    const zaklad = '        <link from="' + esc(l.from) + '" to="' + esc(l.to) + '" column="' +
+                   esc(l.column) + '"' + (l.concept ? ' concept="' + esc(l.concept) + '"' : "");
+    const zdroj = srcXml("            ", l.src);   // odkud se cizí klíč naplní
+    if (!zdroj) { L.push(zaklad + "/>"); continue; }
+    L.push(zaklad + ">");
+    L.push(zdroj);
+    L.push("        </link>");
+  }
+  L.push("    </links>");
+  L.push("");
+  L.push("</cube-model>");
+  return L.join("\n");
+}
+
+/* ==================== Odvození o úroveň níž ==================== */
+/* Doplňuje jen prázdná pole — co jste vyplnili ručně, zůstane. Přepsat vše je zvláštní volba. */
+function genLdm(prepsat) {
+  const zmeny = [];
+  const nastav = (o, pole, hodnota, popis) => {
+    if (!hodnota) return;
+    if (!prepsat && o[pole]) return;
+    if (o[pole] === hodnota) return;
+    o[pole] = hodnota;
+    zmeny.push(popis);
+  };
+  model.facts.forEach(f => {
+    const z = technicalize(f.concept);
+    nastav(f, "name", z ? (/^FAKT/.test(z) ? z : "FAKT_" + z) : "", "fakt " + f.concept);
+    f.measures.forEach(m => nastav(m, "name", technicalize(m.concept), "měřítko " + m.concept));
+  });
+  model.dims.forEach(d => {
+    const z = technicalize(d.concept);
+    nastav(d, "name", z ? (/^DIM/.test(z) ? z : "DIM_" + z) : "", "dimenze " + d.concept);
+    const zaklad = (d.name || "").replace(/^DIM_/, "") || technicalize(d.concept);
+    nastav(d, "key", zaklad ? zaklad + "_ID" : "", "klíč " + d.name);
+    nastav(d, "keyType", "integer", "typ klíče " + d.name);
+    d.attributes.forEach(a => nastav(a, "name", technicalize(a.concept), "atribut " + a.concept));
+  });
+  model.links.forEach(l => {                    // cizí klíč se jmenuje po klíči cílové dimenze
+    const cil = dimByName(l.to);
+    nastav(l, "column", cil && cil.key ? cil.key : "", "cizí klíč " + l.from + " → " + l.to);
+  });
+  return zmeny;
+}
+function genPdm(prepsat) {
+  const zmeny = [];
+  const nastav = (o, pole, hodnota, popis) => {
+    if (!hodnota) return;
+    if (!prepsat && o[pole]) return;
+    if (o[pole] === hodnota) return;
+    o[pole] = hodnota;
+    zmeny.push(popis);
+  };
+  model.facts.forEach(f => {
+    nastav(f, "table", f.name, "tabulka " + f.name);
+    f.measures.forEach(m => nastav(m, "column", m.name, "sloupec " + m.name));
+  });
+  model.dims.forEach(d => {
+    nastav(d, "table", d.name, "tabulka " + d.name);
+    d.attributes.forEach(a => nastav(a, "column", a.name, "sloupec " + a.name));
+  });
+  return zmeny;
+}
+function odvod(kam) {
+  pushUndo();
+  const zmeny = kam === "ldm" ? genLdm(false) : kam === "pdm" ? genPdm(false)
+                : genLdm(false).concat(genPdm(false));
+  render();
+  if (!zmeny.length) { setStatus("Není co odvodit — všechno už je vyplněné."); return; }
+  setStatus("Odvozeno " + zmeny.length + " položek: " + zmeny.slice(0, 4).join(", ") +
+            (zmeny.length > 4 ? " a další" : "") + ". Zpět: Ctrl+Z", "ok");
+}
+
+/* ==================== Tvar modelu: hvězda, nebo vločka ==================== */
+/* Hvězda = fakt uprostřed, dimenze kolem, každá jedním skokem.
+   Vločka = některá dimenze je rozložená na další tabulky (dimenze → dimenze). */
+function shapeInfo() {
+  if (!model.facts.length && !model.dims.length) return { kind: "none", text: "prázdný" };
+  const vlocka = model.links.filter(l => !isFact(l.from) && l.from);
+  if (!model.links.length) return { kind: "none", text: "nespojený" };
+  if (!vlocka.length) return { kind: "star", text: "hvězda" };
+  return { kind: "snow", text: "vločka (" + vlocka.length + "×)", vlocka: vlocka };
+}
+/** Kolik skoků je dimenze od nejbližšího faktu — 1 u hvězdy, víc u vločky. */
+function dimDepth(name) {
+  let hloubka = 1, uzel = name, pojistka = 0;
+  while (pojistka++ < 20) {
+    const dovnitr = model.links.filter(l => l.to === uzel);
+    if (!dovnitr.length) return isFact(uzel) ? hloubka : 0;
+    const zFaktu = dovnitr.filter(l => isFact(l.from))[0];
+    if (zFaktu) return hloubka;
+    uzel = dovnitr[0].from;
+    hloubka++;
+  }
+  return hloubka;
+}
+function isSnowflaked(name) { return model.links.some(l => l.from === name) && !isFact(name); }
+
+/* ==================== Kontroly ==================== */
+function analyze() {
+  const out = [];
+  const err = (msg, ref) => out.push({ sev: "err", msg: msg, ref: ref });
+  const warn = (msg, ref) => out.push({ sev: "warn", msg: msg, ref: ref });
+  const info = (msg, ref) => out.push({ sev: "info", msg: msg, ref: ref });
+
+  const videna = {};
+  for (const n of allNames()) {
+    if (!n) { err("Prvek bez názvu."); continue; }
+    if (videna[n]) err("Název " + n + " je použitý dvakrát.");
+    videna[n] = true;
+  }
+  if (!model.facts.length) warn("Kostka nemá žádnou tabulku faktů — není co měřit.");
+  for (const f of model.facts) {
+    const ref = { kind: "fact", name: f.name };
+    if (!f.measures.length) err("Fakt " + f.name + " nemá žádné měřítko.", ref);
+    if (!f.grain) warn("Fakt " + f.name + " nemá popsanou zrnitost (co je jeden řádek).", ref);
+    if (!model.links.some(l => l.from === f.name))
+      err("Fakt " + f.name + " není napojený na žádnou dimenzi.", ref);
+    const jm = {};
+    for (const me of f.measures) {
+      if (!me.name) err("Fakt " + f.name + " má měřítko bez názvu.", ref);
+      if (jm[me.name]) err("Fakt " + f.name + " má dvě měřítka " + me.name + ".", ref);
+      jm[me.name] = true;
+      if (me.agg === "AVG")
+        info("Průměr u " + f.name + "." + me.name + " nejde sčítat přes úrovně — spočítejte ho " +
+             "až z podílu součtů (SUM/SUM), jinak vyjde jinak než čekáte.", ref);
+    }
+  }
+  for (const d of model.dims) {
+    const ref = { kind: "dim", name: d.name };
+    if (!d.key) err("Dimenze " + d.name + " nemá klíč.", ref);
+    if (!d.attributes.length) warn("Dimenze " + d.name + " nemá žádný atribut — nebude podle čeho řezat.", ref);
+    if (!model.links.some(l => l.to === d.name))
+      warn("Na dimenzi " + d.name + " nic neukazuje — v kostce se neprojeví.", ref);
+    for (const h of d.hierarchies)
+      for (const lv of h.levels)
+        if (!d.attributes.some(a => a.name === lv))
+          err("Hierarchie " + h.name + " v " + d.name + " odkazuje na neexistující atribut " + lv + ".", ref);
+    const hl = dimDepth(d.name);
+    if (hl > 2) info("Dimenze " + d.name + " je " + hl + " skoky od faktu — hluboká vločka " +
+                     "znamená víc JOINů v každém dotazu.", ref);
+  }
+  model.links.forEach((l, i) => {
+    const ref = { kind: "link", idx: i };
+    if (!nodeByName(l.from)) err("Vazba odkazuje na neexistující " + (l.from || "prvek") + ".", ref);
+    if (!dimByName(l.to)) err("Vazba " + l.from + " → " + (l.to || "?") + " musí mířit na dimenzi.", ref);
+    if (!l.column) warn("Vazba " + l.from + " → " + l.to + " nemá název cizího sloupce.", ref);
+  });
+  /* linie dat: co se nemá odkud načíst */
+  const bezZdroje = lineageRows().filter(r => !rowText(r));
+  if (bezZdroje.length)
+    warn("Bez zdroje v linii dat (" + bezZdroje.length + "): " +
+         bezZdroje.slice(0, 4).map(r => (r.uzel.table || r.uzel.name) + "." + r.cil).join(", ") +
+         ". Doplňte je v nástroji LINIE, jinak se do nich nemá co načíst.");
+  /* co ještě není odvozené o úroveň níž */
+  const bezLdm = [], bezPdm = [];
+  for (const n of model.facts.concat(model.dims)) {
+    if (n.concept && !n.name) bezLdm.push(n.concept);
+    if (n.name && !n.table) bezPdm.push(n.name);
+    const polozky = (n.measures || []).concat(n.attributes || []);
+    for (const x of polozky) {
+      if (x.concept && !x.name) bezLdm.push(x.concept);
+      if (x.name && !x.column) bezPdm.push(x.name);
+    }
+  }
+  if (bezLdm.length)
+    info("Bez logického názvu (" + bezLdm.length + "): " + bezLdm.slice(0, 4).join(", ") +
+         ". Doplní je tlačítko CDM → LDM.");
+  if (bezPdm.length)
+    info("Bez fyzického názvu (" + bezPdm.length + "): " + bezPdm.slice(0, 4).join(", ") +
+         ". Doplní je tlačítko LDM → PDM.");
+  /* přejmenování na jedné úrovni druhou nemění — ať to není překvapení */
+  for (const n of model.facts.concat(model.dims)) {
+    const ref = { kind: isFact(n.name) ? "fact" : "dim", name: n.name };
+    if (n.name && n.table && n.name !== n.table)
+      info("Logický název " + n.name + " se rozešel s fyzickým " + n.table +
+           " — jestli je to omyl, přepište tabulku na úrovni PDM.", ref);
+  }
+  const s = shapeInfo();
+  if (s.kind === "snow")
+    info("Model je vločka: " + s.vlocka.map(l => l.from + " → " + l.to).join(", ") +
+         ". Dotazy budou mít o JOIN navíc, zato se atributy neopakují.");
+  return out;
+}
+
+/* ==================== Historie ==================== */
+let undoStack = [], redoStack = [], fieldSnap = null;
+const UNDO_MAX = 60;
+function snapshot() { return JSON.stringify({ model: model, pos: pos }); }
+function pushUndo(snap) {
+  undoStack.push(snap === undefined ? snapshot() : snap);
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  redoStack.length = 0;
+  updateUndoBtns();
+}
+function restoreSnap(s) {
+  const prev = sel && sel.kind !== "link" && sel.name ? sel.name : null;
+  const o = JSON.parse(s);
+  model = o.model; pos = o.pos;
+  sel = null;
+  if (prev && nodeByName(prev)) sel = { kind: isFact(prev) ? "fact" : "dim", name: prev };
+  saveLayout();
+  render();
+  updateUndoBtns();
+}
+function undo() { if (!undoStack.length) return; redoStack.push(snapshot()); restoreSnap(undoStack.pop()); }
+function redo() { if (!redoStack.length) return; undoStack.push(snapshot()); restoreSnap(redoStack.pop()); }
+function updateUndoBtns() {
+  const u = !undoStack.length, r = !redoStack.length;
+  $("btnUndo").disabled = u; $("btnRedo").disabled = r;
+  $("btnUndo2").disabled = u; $("btnRedo2").disabled = r;
+}
+
+/* ==================== Rozmístění ==================== */
+const BW = 236;
+function saveLayout() { try { localStorage.setItem(LS_KEY, JSON.stringify(pos)); } catch (e) {} }
+function loadLayout() {
+  try { const raw = localStorage.getItem(LS_KEY); if (raw) pos = JSON.parse(raw) || {}; }
+  catch (e) { pos = {}; }
+}
+function getPos(n) { return pos[n] || { x: 60, y: 60 }; }
+function ensurePositions() {
+  const chybi = allNames().filter(n => !pos[n]);
+  if (chybi.length) autoLayout(true);
+}
+/** Fakty do prostředního sloupce, jejich dimenze kolem, vločkové dimenze dál od středu. */
+function autoLayout(tise) {
+  const stred = 480, krokY = 250, sirka = 320;
+  let y = 60;
+  model.facts.forEach(f => { pos[f.name] = { x: stred, y: y }; y += krokY; });
+  const hotovo = {};
+  model.facts.forEach(f => {
+    const kolem = model.links.filter(l => l.from === f.name).map(l => l.to);
+    const zaklad = pos[f.name] ? pos[f.name].y : 60;
+    kolem.forEach((n, i) => {
+      if (hotovo[n]) return;
+      hotovo[n] = true;
+      const vlevo = i % 2 === 0;
+      pos[n] = { x: stred + (vlevo ? -sirka : sirka),
+                 y: zaklad - 110 + Math.floor(i / 2) * 190 };
+    });
+  });
+  model.dims.forEach(d => {
+    if (hotovo[d.name] || pos[d.name] && !tise) return;
+    if (hotovo[d.name]) return;
+    const rodic = model.links.filter(l => l.to === d.name)[0];
+    const zdroj = rodic && pos[rodic.from];
+    const h = dimDepth(d.name);
+    pos[d.name] = zdroj ? { x: zdroj.x + (zdroj.x >= stred ? sirka : -sirka), y: zdroj.y + 40 }
+                        : { x: 60, y: 60 + Object.keys(hotovo).length * 190 + h * 10 };
+    hotovo[d.name] = true;
+  });
+  saveLayout();
+  if (!tise) { render(); fitView(); setStatus("Bloky srovnány: fakty doprostřed, dimenze kolem."); }
+}
+
+/* ==================== Vykreslení ==================== */
+let view = { x: 0, y: 0, z: 1 };
+function applyView() {
+  $("world").style.transform = "translate(" + view.x + "px," + view.y + "px) scale(" + view.z + ")";
+  $("zVal").textContent = Math.round(view.z * 100) + " %";
+  updateMmView();
+}
+function render() {
+  if (activeTool !== "cube") {
+    if (activeTool === "lin") renderLineage();
+    if (activeTool === "dop") renderDopad();
+    renderPanel(); renderBrowser(); updateChecksBtn(); updateStatus(); renderMinimap(); return;
+  }
+  renderBlocks(); renderLinks(); renderPanel(); renderBrowser();
+  updateChecksBtn(); updateStatus(); syncSettingsUI(); renderMinimap();
+}
+function nodeProblems() {
+  const p = {};
+  for (const x of analyze()) {
+    if (!x.ref || !x.ref.name) continue;
+    if (x.sev === "err") p[x.ref.name] = "bad";
+    else if (p[x.ref.name] !== "bad" && x.sev === "warn") p[x.ref.name] = "warn";
+  }
+  return p;
+}
+function renderBlocks() {
+  const cont = $("blocks");
+  const probl = nodeProblems();
+  const zvyr = highlightSet();
+  let h = "";
+  for (const f of model.facts) h += blockHtml(f, true, probl, zvyr);
+  for (const d of model.dims) h += blockHtml(d, false, probl, zvyr);
+  cont.innerHTML = h;
+  cont.querySelectorAll(".block").forEach(b => {
+    b.addEventListener("mousedown", ev => blockMouseDown(ev, b));
+  });
+}
+function blockHtml(n, jeFakt, probl, zvyr) {
+  const p = getPos(n.name);
+  const tridy = ["block", jeFakt ? "fact" : "dim"];
+  if (!jeFakt && isSnowflaked(n.name)) tridy.push("snow");
+  if (sel && sel.name === n.name) tridy.push("sel");
+  else if (zvyr && zvyr.indexOf(n.name) >= 0) tridy.push("hi");
+  if (probl[n.name]) tridy.push(probl[n.name]);
+  let h = '<div class="' + tridy.join(" ") + '" data-node="' + esc(n.name) + '" style="left:' +
+    p.x + "px;top:" + p.y + 'px">';
+  h += '<div class="bh"><svg class="ic"><use href="#' + (jeFakt ? "i-fact" : "i-dim") + '"/></svg>' +
+    '<span class="tn">' + esc(labelOf(n)) + "</span>" +
+    '<span class="badge">' + (jeFakt ? "FAKT" : isSnowflaked(n.name) ? "VLOČKA" : "DIMENZE") + "</span></div>";
+  h += '<div class="bb">';
+  const chybi = '<span style="color:var(--red)">?</span>';
+  if (jeFakt) {
+    /* CDM ukazuje jen to, co se měří a podle čeho — žádné klíče ani typy */
+    if (!isC()) {
+      const odkazy = model.links.filter(l => l.from === n.name);
+      odkazy.forEach(l => h += '<div class="row fk"><span class="k">↗</span><span class="n">' +
+        esc(l.column || "?") + '</span><span class="t">→ ' + esc(nazevCile(l.to)) + "</span></div>");
+      if (odkazy.length && n.measures.length) h += '<div class="row sep"></div>';
+    }
+    n.measures.slice(0, 8).forEach(m => {
+      const t = isC() ? m.agg : isP() ? physType(m, m.type) : m.agg + (settings.types ? " · " + m.type : "");
+      h += '<div class="row mea"><span class="k">Σ</span><span class="n">' +
+        (labelOf(m, "column") ? esc(labelOf(m, "column")) : chybi) + "</span>" +
+        (settings.types || isC() ? '<span class="t">' + esc(t) + "</span>" : "") + "</div>";
+    });
+    if (n.measures.length > 8) h += '<div class="more">… a další ' + (n.measures.length - 8) + "</div>";
+    if (isC()) {
+      const kolem = model.links.filter(l => l.from === n.name).map(l => nazevCile(l.to));
+      if (kolem.length) h += '<div class="more">podle: ' + esc(kolem.join(", ")) + "</div>";
+    }
+  } else {
+    if (!isC())
+      h += '<div class="row key"><span class="k">⚿</span><span class="n">' +
+        (n.key ? esc(n.key) : chybi) + '</span><span class="t">' +
+        (isP() ? esc(physType({ sqlType: n.keySqlType }, n.keyType)) :
+         settings.types ? esc(n.keyType) : "klíč") + "</span></div>";
+    if (!isC()) {
+      const ven = model.links.filter(l => l.from === n.name);
+      ven.forEach(l => h += '<div class="row fk"><span class="k">↗</span><span class="n">' +
+        esc(l.column || "?") + '</span><span class="t">→ ' + esc(nazevCile(l.to)) + "</span></div>");
+    }
+    if (n.attributes.length && !isC()) h += '<div class="row sep"></div>';
+    n.attributes.slice(0, 8).forEach(a => {
+      const t = isP() ? physType(a, a.type) : a.type;
+      h += '<div class="row"><span class="k">·</span><span class="n">' +
+        (labelOf(a, "column") ? esc(labelOf(a, "column")) : chybi) + "</span>" +
+        (settings.types && !isC() ? '<span class="t">' + esc(t) + "</span>" : "") + "</div>";
+    });
+    if (n.attributes.length > 8) h += '<div class="more">… a další ' + (n.attributes.length - 8) + "</div>";
+    if (n.hierarchies.length && !isP())
+      h += '<div class="more">' + n.hierarchies.length + " hierarchie: " +
+           esc(n.hierarchies.map(x => x.name).join(", ")) + "</div>";
+  }
+  return h + "</div></div>";
+}
+/** Název cíle vazby tak, jak se hodí na aktuální úrovni. */
+function nazevCile(name) {
+  const n = nodeByName(name);
+  return n ? labelOf(n) : name;
+}
+function blockSize(name) {
+  const el = $("blocks").querySelector('[data-node="' + name.replace(/"/g, '\\"') + '"]');
+  return { w: BW, h: el ? el.offsetHeight : 120 };
+}
+function highlightSet() {
+  if (!sel) return null;
+  if (sel.kind === "link") {
+    const l = model.links[sel.idx];
+    return l ? [l.from, l.to] : null;
+  }
+  if (!sel.name) return null;
+  const out = [];
+  for (const l of model.links) {
+    if (l.from === sel.name) out.push(l.to);
+    if (l.to === sel.name) out.push(l.from);
+  }
+  return out;
+}
+function renderLinks() {
+  const g = $("linkg");
+  while (g.firstChild) g.removeChild(g.firstChild);
+  const zvyr = highlightSet();
+  model.links.forEach((l, i) => {
+    const a = pos[l.from], b = pos[l.to];
+    if (!a || !b) return;
+    const sa = blockSize(l.from), sb = blockSize(l.to);
+    const x1 = a.x + sa.w / 2, y1 = a.y + sa.h / 2, x2 = b.x + sb.w / 2, y2 = b.y + sb.h / 2;
+    const stredX = (x1 + x2) / 2;
+    const d = "M" + x1 + "," + y1 + " C" + stredX + "," + y1 + " " + stredX + "," + y2 + " " + x2 + "," + y2;
+    const vlocka = !isFact(l.from);
+    const hit = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    hit.setAttribute("d", d); hit.setAttribute("class", "linkhit");
+    hit.addEventListener("mousedown", ev => { ev.stopPropagation(); sel = { kind: "link", idx: i }; render(); });
+    g.appendChild(hit);
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    p.setAttribute("d", d);
+    p.setAttribute("class", "link" + (vlocka ? " snow" : "") +
+      (sel && sel.kind === "link" && sel.idx === i ? " sel" :
+       zvyr && (zvyr.indexOf(l.from) >= 0 || zvyr.indexOf(l.to) >= 0) ? " hi" : ""));
+    g.appendChild(p);
+    const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    t.setAttribute("x", stredX); t.setAttribute("y", (y1 + y2) / 2 - 5);
+    t.setAttribute("text-anchor", "middle"); t.setAttribute("class", "linklab");
+    t.textContent = isC() ? (l.concept || "") : (l.column || "?");
+    g.appendChild(t);
+  });
+  const w = $("world");
+  let maxX = 1200, maxY = 800;
+  for (const n of allNames()) {
+    const p = getPos(n), s = blockSize(n);
+    maxX = Math.max(maxX, p.x + s.w + 120); maxY = Math.max(maxY, p.y + s.h + 120);
+  }
+  $("links").setAttribute("width", maxX); $("links").setAttribute("height", maxY);
+  w.style.width = maxX + "px"; w.style.height = maxY + "px";
+}
+
+/* ==================== Prohlížeč modelu ==================== */
+let treeOpen = { facts: true, dims: true };
+function renderBrowser() {
+  let h = "";
+  h += '<div class="tr grp" data-tgrp="facts"><span class="car">' + (treeOpen.facts ? "▾" : "▸") +
+       '</span><span>Fakty</span><span class="d">(' + model.facts.length + ")</span></div>";
+  if (treeOpen.facts) for (const f of model.facts)
+    h += '<div class="tr fact' + (sel && sel.name === f.name ? " sel" : "") + '" data-go="' + esc(f.name) +
+      '" style="padding-left:14px"><span class="car"></span>' +
+      '<svg class="ic"><use href="#i-fact"/></svg><span class="nm">' + esc(labelOf(f)) + "</span>" +
+      '<span class="d">' + f.measures.length + " měřítek</span></div>";
+  h += '<div class="tr grp" data-tgrp="dims"><span class="car">' + (treeOpen.dims ? "▾" : "▸") +
+       '</span><span>Dimenze</span><span class="d">(' + model.dims.length + ")</span></div>";
+  if (treeOpen.dims) for (const d of model.dims)
+    h += '<div class="tr dim' + (sel && sel.name === d.name ? " sel" : "") + '" data-go="' + esc(d.name) +
+      '" style="padding-left:14px"><span class="car"></span>' +
+      '<svg class="ic"><use href="#i-dim"/></svg><span class="nm">' + esc(labelOf(d)) + "</span>" +
+      '<span class="d">' + (isSnowflaked(d.name) ? "vločka" : dimDepth(d.name) === 1 ? "" : "…") + "</span></div>";
+  $("tree").innerHTML = h;
+  $("tree").querySelectorAll("[data-tgrp]").forEach(el => el.onclick = () => {
+    treeOpen[el.dataset.tgrp] = !treeOpen[el.dataset.tgrp]; renderBrowser();
+  });
+  $("tree").querySelectorAll("[data-go]").forEach(el => {
+    el.onclick = () => { vyber(el.dataset.go); };
+    el.ondblclick = () => { vyber(el.dataset.go); centerOn(el.dataset.go); };
+  });
+}
+function vyber(name) {
+  sel = { kind: isFact(name) ? "fact" : "dim", name: name };
+  render();
+}
+function centerOn(name) {
+  const p = pos[name]; if (!p) return;
+  const c = $("canvas"), s = blockSize(name);
+  view.x = c.clientWidth / 2 - (p.x + s.w / 2) * view.z;
+  view.y = c.clientHeight / 2 - (p.y + s.h / 2) * view.z;
+  applyView();
+}
+
+/* ==================== Stavový řádek ==================== */
+function setStatus(msg, cls) { const e = $("statusMsg"); e.textContent = msg; e.className = cls || ""; }
+function updateStatus() {
+  const mer = model.facts.reduce((n, f) => n + f.measures.length, 0);
+  $("statusInfo").textContent = model.facts.length + " faktů · " + model.dims.length + " dimenzí · " +
+    mer + " měřítek · " + model.links.length + " vazeb";
+  let s = "";
+  if (sel && sel.kind === "link" && model.links[sel.idx])
+    s = "Vazba: " + model.links[sel.idx].from + " → " + model.links[sel.idx].to;
+  else if (sel && sel.name) s = (sel.kind === "fact" ? "Fakt: " : "Dimenze: ") + sel.name;
+  $("statusSel").textContent = s;
+  const sh = shapeInfo();
+  const b = $("shapeBadge");
+  b.textContent = sh.text;
+  b.className = "shape " + sh.kind;
+}
+function updateChecksBtn() {
+  const ps = analyze();
+  const errs = ps.filter(p => p.sev === "err").length;
+  const warns = ps.filter(p => p.sev === "warn").length;
+  const b = $("btnChecks");
+  b.classList.toggle("bad", errs > 0);
+  b.classList.toggle("warn", errs === 0 && warns > 0);
+  $("chkLabel").textContent = errs || warns ? "Kontroly (" + (errs + warns) + ")" : "Kontroly";
+}
+
+/* ==================== Panel vlastností ==================== */
+let pFold = { name: null, head: true, list: true, hier: true };
+function panelFold(n) {
+  if (pFold.name !== n) pFold = { name: n, head: true, list: true, hier: true };
+  return pFold;
+}
+function fld(label, inner) { return '<div><label class="f">' + label + "</label>" + inner + "</div>"; }
+function inp(da, v, ph) {
+  return '<input type="text" ' + da + ' value="' + esc(v) + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : "") + ">";
+}
+function ta(da, v, ph) {
+  return '<textarea class="desc" rows="3" ' + da + (ph ? ' placeholder="' + esc(ph) + '"' : "") + ">" + esc(v) + "</textarea>";
+}
+function sel1(da, v, opts) {
+  return "<select " + da + ">" + opts.map(o => '<option value="' + esc(o) + '"' +
+    (o === v ? " selected" : "") + ">" + esc(o) + "</option>").join("") + "</select>";
+}
+function typeSel(da, v) { return sel1(da, v, TYPES.map(t => t.t)); }
+/** Proužek nahoře v panelu — na které úrovni právě pracujete a co to znamená. */
+function levelBanner() {
+  const l = LEVELS[level];
+  return '<div class="chk info" style="cursor:default;margin-top:10px"><span class="lvl">' +
+    esc(l.nazev.split(" ")[0]) + "</span>" + l.popis + "</div>";
+}
+/** Sekce „co se stane, když tohle smažu" — ukazuje se u vybraného prvku. */
+function dopadSekce(cil) {
+  const d = impactOf(cil);
+  const zlomy = d.filter(x => x.sev === "err").length;
+  let h = '<h3 class="sec">Dopad smazání' + (zlomy ? " — " + zlomy + "× rozbije" : "") + "</h3>";
+  if (!d.length) return h + '<div class="okline">Nic na tom nevisí, smazání se jinde neprojeví.</div>';
+  d.forEach(x => h += '<div class="dopline ' + x.sev + '" style="margin-bottom:4px">' + esc(x.text) + "</div>");
+  h += '<div class="hint" style="margin-top:7px;color:var(--txt3)">Celý přehled je v nástroji ' +
+       "<b>DOPAD</b>. Mazání se neptá na potvrzení — vrací se krokem zpět.</div>";
+  return h;
+}
+/** Odkud se sloupec bere — jen k nahlédnutí, upravuje se v nástroji LINIE. */
+function zdrojRadek(n, x) {
+  const s = srcText(n, x);
+  return '<div class="hint" style="margin-top:7px;color:var(--txt3)">Zdroj: ' +
+    (s ? "<b>" + esc(s) + "</b>" : '<span style="color:var(--amber)">nevyplněn</span>') +
+    " — mění se v nástroji <b>LINIE</b>.</div>";
+}
+function odvozenoZ(text) {
+  return '<div class="hint" style="margin-top:5px;color:var(--txt3)">Odvozuje se ' + esc(text) +
+         " — tlačítkem <b>Odvodit o úroveň níž</b> na kartě Domů.</div>";
+}
+function foldHead(key, nazev, pocet, otevreno) {
+  return '<h3 class="sec fold" data-pfold="' + key + '"><span class="car">' + (otevreno ? "▾" : "▸") +
+    "</span>" + nazev + (pocet === "" ? "" : " (" + pocet + ")") + "</h3>";
+}
+
+function renderPanel() {
+  const p = $("panelBody");
+  if (!sel) { p.innerHTML = modelPanel(); bindPanel(p); return; }
+  if (sel.kind === "link") { p.innerHTML = linkPanel(model.links[sel.idx]); bindPanel(p); return; }
+  const n = nodeByName(sel.name);
+  if (!n) { sel = null; p.innerHTML = modelPanel(); bindPanel(p); return; }
+  p.innerHTML = sel.kind === "fact" ? factPanel(n) : dimPanel(n);
+  bindPanel(p);
+}
+
+function modelPanel() {
+  const sh = shapeInfo();
+  let h = "<h2>Kostka</h2><div class=\"sub\">" + esc(model.name) + "</div>";
+  h += levelBanner();
+  h += '<div class="grid">' + fld("Název kostky", inp('data-m="name"', model.name)) +
+       fld("Datum", inp('data-m="created"', model.created)) + "</div>";
+  h += '<h3 class="sec">Tři úrovně modelu</h3><div class="hint">' +
+    "Stejná kostka se dá popsat na třech úrovních a každá další z té předchozí vychází:<br><br>" +
+    "<b>CDM</b> — konceptuální. Co měříme a podle čeho. Řeč zadavatele, žádná technika.<br>" +
+    "<b>LDM</b> — logický. Entity, klíče, atributy, logické typy. Ještě bez databáze.<br>" +
+    "<b>PDM</b> — fyzický. Tabulky, sloupce a typy zvolené databáze — z toho se generuje SQL.<br><br>" +
+    "Úroveň přepnete na kartě <b>Domů</b>. Tlačítka <b>CDM → LDM</b> a <b>LDM → PDM</b> " +
+    "vyplní nižší úroveň z vyšší; co jste dopsal ručně, nechají být." + "</div>";
+  h += '<h3 class="sec">Tvar</h3><div><span class="shape ' + sh.kind + '">' + esc(sh.text) + "</span></div>";
+  h += '<div class="hint" style="margin-top:8px">' + (
+    sh.kind === "star" ? "<b>Hvězda</b>: fakt uprostřed, každá dimenze jednou tabulkou hned vedle. " +
+      "Dotaz má jeden JOIN na dimenzi, data se opakují (u zboží je název kategorie na každém řádku)." :
+    sh.kind === "snow" ? "<b>Vločka</b>: některá dimenze je rozložená do dalších tabulek. " +
+      "Neopakují se data, ale každá úroveň znamená JOIN navíc. Vločku dělejte jen tam, kde se " +
+      "číselník opravdu sdílí nebo je hodně velký — jinak zůstaňte u hvězdy." :
+    "Vložte tabulku faktů (co měříte) a kolem ni dimenze (podle čeho to chcete řezat), " +
+    "pak je propojte tlačítkem <b>Napojit</b>.") + "</div>";
+  if (model.facts.length) {
+    h += '<h3 class="sec">Fakty</h3>';
+    model.facts.forEach(f => h += '<div class="listitem" data-go="' + esc(f.name) + '"><div class="t">' +
+      esc(f.name) + '</div><div class="d">' + f.measures.length + " měřítek · " +
+      model.links.filter(l => l.from === f.name).length + " dimenzí</div></div>");
+  }
+  if (model.dims.length) {
+    h += '<h3 class="sec">Dimenze</h3>';
+    model.dims.forEach(d => h += '<div class="listitem" data-go="' + esc(d.name) + '"><div class="t">' +
+      esc(d.name) + '</div><div class="d">' + d.attributes.length + " atributů" +
+      (isSnowflaked(d.name) ? " · vločka" : "") + "</div></div>");
+  }
+  const ps = analyze();
+  h += '<h3 class="sec">Kontroly' + (ps.length ? " (" + ps.length + ")" : "") + "</h3>";
+  if (!ps.length) h += '<div class="okline">Model je bez připomínek.</div>';
+  else ps.forEach((x, i) => h += '<div class="chk ' + x.sev + '" data-chk="' + i + '"><span class="lvl">' +
+    (x.sev === "err" ? "CHYBA" : x.sev === "warn" ? "POZOR" : "TIP") + "</span>" + esc(x.msg) + "</div>");
+  h += '<h3 class="sec">Jak na to</h3><div class="hint">' +
+    "<b>Fakt</b> je to, co měříte — prodeje, jízdy, hovory. Má číselná <b>měřítka</b> (kolik, za kolik) " +
+    "a cizí klíče do dimenzí.<br><br>" +
+    "<b>Dimenze</b> je to, podle čeho měřítka řežete — čas, zboží, prodejna. Má klíč a popisné atributy.<br><br>" +
+    "<b>Zrnitost</b> je nejdůležitější věta celé kostky: co je jeden řádek faktu. " +
+    "Napište ji jako první, všechno ostatní z ní vyplyne.<br><br>" +
+    "Napojíte-li dimenzi na další dimenzi, vznikne <b>vločka</b>." +
+    "</div>";
+  return h;
+}
+
+function factPanel(f) {
+  const fo = panelFold(f.name);
+  let h = "<h2>" + esc(f.name) + '</h2><div class="sub">tabulka faktů</div>';
+  h += levelBanner();
+  h += foldHead("head", "Fakt", "", fo.head);
+  h += '<div class="foldbody' + (fo.head ? "" : " off") + '">';
+  if (isC()) h += '<div class="grid">' + fld("Co měříme (byznysový název)",
+       inp('data-nf="concept"', f.concept, "např. Prodej")) + "</div>";
+  else if (isP()) h += '<div class="grid">' + fld("Tabulka v databázi", inp('data-nf="table"', f.table)) +
+       "</div>" + odvozenoZ("z logického názvu " + f.name);
+  else h += '<div class="grid">' + fld("Název entity", inp('data-nf="name"', f.name)) + "</div>" +
+       odvozenoZ("z konceptu " + f.concept);
+  h += '<div style="margin-top:6px">' + fld("Zrnitost — co je jeden řádek",
+       ta('data-nf="grain"', f.grain, "např. jedna položka na jedné účtence")) + "</div>";
+  h += '<div style="margin-top:6px">' + fld("Popis", ta('data-nf="description"', f.description)) + "</div>";
+  h += "</div>";
+
+  h += foldHead("list", "Měřítka", f.measures.length, fo.list);
+  h += '<div class="foldbody' + (fo.list ? "" : " off") + '">';
+  f.measures.forEach((m, i) => {
+    const open = !!fo["m" + i];
+    h += '<div class="prow' + (open ? " open" : "") + '" data-pitem="m' + i + '">' +
+      '<span class="car">' + (open ? "▾" : "▸") + '</span><span class="nm">' + esc(m.name || "měřítko") +
+      '</span><span class="ty">' + esc(m.agg) + "</span>" +
+      '<span class="acts"><button class="b sm" data-mv="' + i + ':-1">↑</button>' +
+      '<button class="b sm" data-mv="' + i + ':1">↓</button>' +
+      '<button class="b sm danger" data-delm="' + i + '">✕</button></span></div>';
+    const da = 'data-mi="' + i + '" data-mf=';
+    h += '<div class="pdet' + (open ? "" : " off") + '">';
+    if (isC()) h += '<div class="grid g2">' + fld("Co se měří", inp(da + '"concept"', m.concept)) +
+         fld("Jak se sčítá", sel1(da + '"agg"', m.agg, AGGS)) + "</div>";
+    else if (isP()) h += '<div class="grid g2">' + fld("Sloupec v DB", inp(da + '"column"', m.column)) +
+         fld("Typ v DB (prázdné = odvodit)", inp(da + '"sqlType"', m.sqlType, sqlType(m.type))) + "</div>";
+    else h += '<div class="grid g3">' + fld("Název", inp(da + '"name"', m.name)) +
+         fld("Agregace", sel1(da + '"agg"', m.agg, AGGS)) +
+         fld("Typ", typeSel(da + '"type"', m.type)) + "</div>";
+    h += '<div style="margin-top:6px">' + fld("Popis", ta(da + '"description"', m.description)) + "</div>";
+    h += zdrojRadek(f, m);
+    h += "</div>";
+  });
+  if (!f.measures.length) h += '<div class="hint" style="padding:2px 3px">Zatím žádné měřítko.</div>';
+  h += '<button class="b prim" id="btnAddMeasure" style="margin-top:7px">+ Měřítko</button></div>';
+
+  h += '<h3 class="sec">Napojené dimenze</h3>';
+  const odkazy = model.links.map((l, i) => ({ l: l, i: i })).filter(x => x.l.from === f.name);
+  if (!odkazy.length) h += '<div class="hint">Fakt zatím nikam neukazuje. Použijte <b>Napojit</b>.</div>';
+  odkazy.forEach(x => h += '<div class="listitem" data-sellink="' + x.i + '"><div class="t">' +
+    esc(x.l.to) + '</div><div class="d">přes sloupec ' + esc(x.l.column || "?") + "</div></div>");
+  h += dopadSekce({ kind: "fact", name: f.name });
+  h += '<button class="b danger" id="btnDelNode" style="margin-top:9px">✕ Smazat fakt</button>';
+  return h;
+}
+
+function dimPanel(d) {
+  const fo = panelFold(d.name);
+  const hloubka = dimDepth(d.name);
+  let h = "<h2>" + esc(d.name) + '</h2><div class="sub">dimenze' +
+          (isSnowflaked(d.name) ? " · vločka" : "") + "</div>";
+  h += levelBanner();
+  h += foldHead("head", "Dimenze", "", fo.head);
+  h += '<div class="foldbody' + (fo.head ? "" : " off") + '">';
+  if (isC()) h += '<div class="grid">' + fld("Podle čeho sledujeme (byznysový název)",
+       inp('data-nf="concept"', d.concept, "např. Zboží")) + "</div>";
+  else if (isP()) {
+    h += '<div class="grid g2">' + fld("Tabulka v DB", inp('data-nf="table"', d.table)) +
+         fld("Typ klíče v DB (prázdné = odvodit)",
+             inp('data-nf="keySqlType"', d.keySqlType, sqlType(d.keyType))) + "</div>";
+    h += odvozenoZ("z logického názvu " + d.name);
+  } else {
+    h += '<div class="grid g2">' + fld("Název entity", inp('data-nf="name"', d.name)) +
+         fld("Klíč", inp('data-nf="key"', d.key)) + "</div>";
+    h += '<div class="grid" style="margin-top:6px">' +
+         fld("Typ klíče", typeSel('data-nf="keyType"', d.keyType)) + "</div>";
+    h += odvozenoZ("z konceptu " + d.concept);
+  }
+  h += '<div style="margin-top:6px">' + fld("Popis", ta('data-nf="description"', d.description)) + "</div>";
+  h += '<div class="hint" style="margin-top:7px">Vzdálenost od faktu: <b>' +
+       (hloubka || "—") + "</b> " + (hloubka === 1 ? "skok (hvězda)" : hloubka > 1 ? "skoky (vločka)" :
+       "— na dimenzi nic neukazuje") + "</div>";
+  h += "</div>";
+
+  h += foldHead("list", "Atributy", d.attributes.length, fo.list);
+  h += '<div class="foldbody' + (fo.list ? "" : " off") + '">';
+  d.attributes.forEach((a, i) => {
+    const open = !!fo["a" + i];
+    h += '<div class="prow' + (open ? " open" : "") + '" data-pitem="a' + i + '">' +
+      '<span class="car">' + (open ? "▾" : "▸") + '</span><span class="nm">' + esc(a.name || "atribut") +
+      '</span><span class="ty">' + esc(a.type) + "</span>" +
+      '<span class="acts"><button class="b sm" data-av="' + i + ':-1">↑</button>' +
+      '<button class="b sm" data-av="' + i + ':1">↓</button>' +
+      '<button class="b sm danger" data-dela="' + i + '">✕</button></span></div>';
+    const da = 'data-ai="' + i + '" data-af=';
+    h += '<div class="pdet' + (open ? "" : " off") + '">';
+    if (isC()) h += '<div class="grid">' + fld("Co to je", inp(da + '"concept"', a.concept)) + "</div>";
+    else if (isP()) h += '<div class="grid g2">' + fld("Sloupec v DB", inp(da + '"column"', a.column)) +
+         fld("Typ v DB (prázdné = odvodit)", inp(da + '"sqlType"', a.sqlType, sqlType(a.type))) + "</div>";
+    else h += '<div class="grid g2">' + fld("Název", inp(da + '"name"', a.name)) +
+         fld("Typ", typeSel(da + '"type"', a.type)) + "</div>";
+    h += '<div style="margin-top:6px">' + fld("Popis", ta(da + '"description"', a.description)) + "</div>";
+    h += zdrojRadek(d, a);
+    h += "</div>";
+  });
+  if (!d.attributes.length) h += '<div class="hint" style="padding:2px 3px">Zatím žádný atribut.</div>';
+  h += '<button class="b prim" id="btnAddAttr" style="margin-top:7px">+ Atribut</button></div>';
+
+  h += foldHead("hier", "Hierarchie", d.hierarchies.length, fo.hier);
+  h += '<div class="foldbody' + (fo.hier ? "" : " off") + '">';
+  h += '<div class="hint" style="margin-bottom:7px">Hierarchie říká, jak se dá vrtat od hrubého ' +
+       "k jemnému — rok → čtvrtletí → měsíc → den. Úrovně pište názvy atributů oddělené čárkou.</div>";
+  d.hierarchies.forEach((x, i) => {
+    h += '<div class="grid" style="margin-bottom:7px">' +
+      '<div class="prow open"><span class="nm">' + esc(x.name || "hierarchie") + "</span>" +
+      '<span class="acts"><button class="b sm danger" data-delh="' + i + '">✕</button></span></div>' +
+      fld("Název", inp('data-hi="' + i + '" data-hf="name"', x.name)) +
+      fld("Úrovně (čárkou, od hrubé)", inp('data-hi="' + i + '" data-hf="levels"', x.levels.join(", "))) +
+      "</div>";
+  });
+  if (!d.hierarchies.length) h += '<div class="hint" style="padding:2px 3px">Zatím žádná.</div>';
+  h += '<button class="b sm" id="btnAddHier" style="margin-top:4px">+ Hierarchie</button></div>';
+
+  h += '<h3 class="sec">Vazby</h3>';
+  const dovnitr = model.links.map((l, i) => ({ l: l, i: i })).filter(x => x.l.to === d.name);
+  const ven = model.links.map((l, i) => ({ l: l, i: i })).filter(x => x.l.from === d.name);
+  dovnitr.forEach(x => h += '<div class="listitem" data-sellink="' + x.i + '"><div class="t">← ' +
+    esc(x.l.from) + '</div><div class="d">ukazuje sem přes ' + esc(x.l.column || "?") + "</div></div>");
+  ven.forEach(x => h += '<div class="listitem" data-sellink="' + x.i + '"><div class="t">→ ' +
+    esc(x.l.to) + '</div><div class="d">vločka, přes ' + esc(x.l.column || "?") + "</div></div>");
+  if (!dovnitr.length && !ven.length) h += '<div class="hint">Dimenze zatím nikam nepatří.</div>';
+  h += dopadSekce({ kind: "dim", name: d.name });
+  h += '<button class="b danger" id="btnDelNode" style="margin-top:9px">✕ Smazat dimenzi</button>';
+  return h;
+}
+
+function linkPanel(l) {
+  if (!l) return modelPanel();
+  const vlocka = !isFact(l.from);
+  let h = "<h2>Vazba</h2><div class=\"sub\">" + esc(l.from) + " → " + esc(l.to) + "</div>";
+  h += '<div class="grid">' +
+    fld("Z (fakt nebo dimenze)", sel1('data-lf="from"', l.from, allNames())) +
+    fld("Do (dimenze)", sel1('data-lf="to"', l.to, model.dims.map(d => d.name))) +
+    fld("Cizí klíč — sloupec v tabulce vlevo", inp('data-lf="column"', l.column, "např. DATUM_ID")) + "</div>";
+  h += '<div class="hint" style="margin-top:10px">' + (vlocka
+    ? "Tahle vazba dělá z modelu <b>vločku</b> — dimenze ukazuje na další dimenzi. " +
+      "V dotazu to znamená JOIN navíc, zato se hodnoty neopakují."
+    : "Běžná vazba <b>fakt → dimenze</b>. Sloupec je cizí klíč v tabulce faktů, míří na klíč dimenze <b>" +
+      esc(l.to) + "</b>.") + "</div>";
+  h += dopadSekce({ kind: "link", idx: sel.idx });
+  h += '<button class="b danger" id="btnDelLink" style="margin-top:9px">✕ Smazat vazbu</button>';
+  return h;
+}
+
+function bindPanel(root) {
+  root.querySelectorAll("[data-m]").forEach(el => {
+    const h = () => { model[el.dataset.m] = el.value; updateStatus(); };
+    el.oninput = h; el.onchange = h;
+  });
+  root.querySelectorAll("[data-pfold]").forEach(el => el.onclick = () => {
+    pFold[el.dataset.pfold] = !pFold[el.dataset.pfold]; renderPanel();
+  });
+  root.querySelectorAll("[data-pitem]").forEach(el => el.onclick = ev => {
+    if (ev.target.closest("button")) return;
+    pFold[el.dataset.pitem] = !pFold[el.dataset.pitem]; renderPanel();
+  });
+  root.querySelectorAll("[data-go]").forEach(el => el.onclick = () => vyber(el.dataset.go));
+  root.querySelectorAll("[data-sellink]").forEach(el => el.onclick = () => {
+    sel = { kind: "link", idx: +el.dataset.sellink }; render();
+  });
+  const probl = analyze();
+  root.querySelectorAll("[data-chk]").forEach(el => el.onclick = () => {
+    const r = probl[+el.dataset.chk].ref;
+    if (!r) return;
+    if (r.kind === "link") sel = { kind: "link", idx: r.idx };
+    else if (nodeByName(r.name)) sel = { kind: r.kind, name: r.name };
+    render();
+  });
+
+  const uzel = () => sel && sel.name ? nodeByName(sel.name) : null;
+  root.querySelectorAll("[data-nf]").forEach(el => {
+    const h = () => {
+      const n = uzel(); if (!n) return;
+      const f = el.dataset.nf;
+      if (f === "name") { renameNode(n.name, el.value); sel.name = el.value; }
+      else n[f] = el.value;
+      renderBlocks(); renderLinks(); renderBrowser(); updateStatus();
+    };
+    el.oninput = h; el.onchange = h;
+  });
+  root.querySelectorAll("[data-mi][data-mf]").forEach(el => {
+    const h = () => {
+      const f = uzel(); if (!f) return;
+      f.measures[+el.dataset.mi][el.dataset.mf] = el.value;
+      renderBlocks();
+    };
+    el.oninput = h; el.onchange = h;
+  });
+  root.querySelectorAll("[data-ai][data-af]").forEach(el => {
+    const h = () => {
+      const d = uzel(); if (!d) return;
+      d.attributes[+el.dataset.ai][el.dataset.af] = el.value;
+      renderBlocks();
+    };
+    el.oninput = h; el.onchange = h;
+  });
+  root.querySelectorAll("[data-hi][data-hf]").forEach(el => el.oninput = () => {
+    const d = uzel(); if (!d) return;
+    const x = d.hierarchies[+el.dataset.hi];
+    if (el.dataset.hf === "levels") x.levels = el.value.split(",").map(s => s.trim()).filter(Boolean);
+    else x.name = el.value;
+    renderBlocks();
+  });
+  root.querySelectorAll("[data-lf]").forEach(el => {
+    const h = () => {
+      const l = model.links[sel.idx]; if (!l) return;
+      l[el.dataset.lf] = el.value;
+      render();
+    };
+    el.oninput = h; el.onchange = h;
+  });
+
+  root.querySelectorAll("[data-delm]").forEach(b => b.onclick = () => {
+    pushUndo(); uzel().measures.splice(+b.dataset.delm, 1); render();
+  });
+  root.querySelectorAll("[data-mv]").forEach(b => b.onclick = () => {
+    const p = b.dataset.mv.split(":").map(Number), a = uzel().measures, j = p[0] + p[1];
+    if (j < 0 || j >= a.length) return;
+    pushUndo(); const t = a[p[0]]; a[p[0]] = a[j]; a[j] = t; render();
+  });
+  root.querySelectorAll("[data-dela]").forEach(b => b.onclick = () => {
+    pushUndo(); uzel().attributes.splice(+b.dataset.dela, 1); render();
+  });
+  root.querySelectorAll("[data-av]").forEach(b => b.onclick = () => {
+    const p = b.dataset.av.split(":").map(Number), a = uzel().attributes, j = p[0] + p[1];
+    if (j < 0 || j >= a.length) return;
+    pushUndo(); const t = a[p[0]]; a[p[0]] = a[j]; a[j] = t; render();
+  });
+  root.querySelectorAll("[data-delh]").forEach(b => b.onclick = () => {
+    pushUndo(); uzel().hierarchies.splice(+b.dataset.delh, 1); render();
+  });
+
+  const add = (id, fn) => { const b = $(id); if (b) b.onclick = fn; };
+  add("btnAddMeasure", () => {
+    pushUndo();
+    const f = uzel();
+    let n = "MERITKO", k = 2;
+    while (f.measures.some(m => m.name === n)) n = "MERITKO_" + k++;
+    f.measures.push(newMeasure(n));
+    render();
+    setStatus("Přibylo měřítko " + n + ". Zpět: Ctrl+Z", "ok");
+  });
+  add("btnAddAttr", () => {
+    pushUndo();
+    const d = uzel();
+    let n = "ATRIBUT", k = 2;
+    while (d.attributes.some(a => a.name === n)) n = "ATRIBUT_" + k++;
+    d.attributes.push(newAttr(n));
+    render();
+    setStatus("Přibyl atribut " + n + ". Zpět: Ctrl+Z", "ok");
+  });
+  add("btnAddHier", () => {
+    pushUndo();
+    const d = uzel();
+    d.hierarchies.push({ name: "Hierarchie", levels: d.attributes.map(a => a.name).slice(0, 3) });
+    render();
+  });
+  add("btnDelNode", () => deleteNode(sel.name));
+  add("btnDelLink", () => {
+    pushUndo(); model.links.splice(sel.idx, 1); sel = null; render();
+    setStatus("Vazba smazána. Zpět: Ctrl+Z");
+  });
+}
+
+/* ==================== Úpravy modelu ==================== */
+function renameNode(stary, novy) {
+  if (stary === novy) return;
+  if (pos[stary]) { pos[novy] = pos[stary]; delete pos[stary]; saveLayout(); }
+  for (const l of model.links) {
+    if (l.from === stary) l.from = novy;
+    if (l.to === stary) l.to = novy;
+  }
+  const n = nodeByName(stary);
+  if (n) n.name = novy;
+}
+function volneJmeno(zaklad) {
+  let n = zaklad, k = 2;
+  while (nodeByName(n)) n = zaklad + "_" + k++;
+  return n;
+}
+function stredPlochy() {
+  const c = $("canvas");
+  return { x: Math.round((c.clientWidth / 2 - view.x) / view.z - BW / 2),
+           y: Math.round((c.clientHeight / 2 - view.y) / view.z - 60) };
+}
+function addFact() {
+  pushUndo();
+  const n = volneJmeno("FAKT_NOVY");
+  model.facts.push(newFact(n, "Nový fakt"));
+  pos[n] = stredPlochy();
+  saveLayout();
+  sel = { kind: "fact", name: n };
+  render();
+  setStatus("Přibyl fakt " + n + ". Popište mu zrnitost a přidejte měřítka.", "ok");
+}
+function addDim() {
+  pushUndo();
+  const n = volneJmeno("DIM_NOVA");
+  model.dims.push(newDim(n, "Nová dimenze"));
+  const s = stredPlochy();
+  pos[n] = { x: s.x + 300, y: s.y + 40 };
+  saveLayout();
+  sel = { kind: "dim", name: n };
+  render();
+  setStatus("Přibyla dimenze " + n + ". Napojte ji na fakt tlačítkem Napojit.", "ok");
+}
+function deleteNode(name) {
+  const n = nodeByName(name);
+  if (!n) return;
+  pushUndo();
+  const kolik = model.links.filter(l => l.from === name || l.to === name).length;
+  model.links = model.links.filter(l => l.from !== name && l.to !== name);
+  model.facts = model.facts.filter(f => f.name !== name);
+  model.dims = model.dims.filter(d => d.name !== name);
+  delete pos[name];
+  saveLayout();
+  sel = null;
+  render();
+  setStatus("Smazáno " + name + (kolik ? " a " + kolik + " vazeb" : "") + ". Zpět: Ctrl+Z");
+}
+function deleteSelection() {
+  if (!sel) return;
+  if (sel.kind === "link") {
+    pushUndo(); model.links.splice(sel.idx, 1); sel = null; render();
+    setStatus("Vazba smazána. Zpět: Ctrl+Z");
+    return;
+  }
+  if (sel.name) deleteNode(sel.name);
+}
+/** Odvodí název cizího sloupce z klíče dimenze. */
+function makeLink(from, to) {
+  if (from === to) { setStatus("Prvek nejde napojit sám na sebe.", "err"); return; }
+  const cil = dimByName(to);
+  if (!cil) { setStatus("Napojit jde jen NA dimenzi.", "err"); return; }
+  if (model.links.some(l => l.from === from && l.to === to)) {
+    setStatus("Tahle vazba už existuje.", "err"); return;
+  }
+  pushUndo();
+  model.links.push({ from: from, to: to, column: cil.key || to + "_ID" });
+  sel = { kind: "link", idx: model.links.length - 1 };
+  render();
+  setStatus(isFact(from) ? "Fakt " + from + " napojen na dimenzi " + to + "."
+                         : "Vločka: " + from + " → " + to + ". Přibude JOIN v dotazech.", "ok");
+}
+
+/* ==================== Myš na ploše ==================== */
+let mode = "select", pending = null, drag = null, pan = null;
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll("[data-mode]").forEach(b => b.classList.toggle("act", b.dataset.mode === m));
+  $("canvas").classList.toggle("linking", m === "link");
+  if (m !== "link") { pending = null; $("hintbar").classList.remove("on"); }
+  else showHint("Klepněte na výchozí prvek (fakt nebo dimenzi).");
+}
+function showHint(t) { $("hintbar").textContent = t; $("hintbar").classList.add("on"); }
+function blockMouseDown(ev, el) {
+  const name = el.dataset.node;
+  if (mode === "link") {
+    ev.stopPropagation();
+    if (!pending) { pending = name; showHint("Teď klepněte na cílovou dimenzi (z " + name + ")."); render(); return; }
+    const a = pending; pending = null;
+    makeLink(a, name);
+    setMode("select");
+    return;
+  }
+  if (!ev.target.closest(".bh")) { vyber(name); return; }
+  ev.stopPropagation();
+  vyber(name);
+  const p = getPos(name);
+  drag = { name: name, dx: ev.clientX / view.z - p.x, dy: ev.clientY / view.z - p.y, moved: false, snap: snapshot() };
+}
+$("canvas").addEventListener("mousedown", ev => {
+  if (ev.target.closest(".block") || ev.target.closest("#zoombar")) return;
+  if (mode === "link") { pending = null; setMode("select"); return; }
+  sel = null; render();
+  pan = { x: ev.clientX - view.x, y: ev.clientY - view.y };
+  $("canvas").classList.add("panning");
+});
+/* Kolik se má kamera posunout, když se s blokem přijede k okraji plochy.
+   Čím blíž ke kraji, tím rychleji — u samého okraje plnou rychlostí. */
+const EDGE_ZONE = 70, EDGE_SPEED = 16;
+function edgeDelta(x, y, r) {
+  const sila = d => d >= EDGE_ZONE ? 0 : Math.min(1, (EDGE_ZONE - d) / EDGE_ZONE);
+  return { dx: Math.round((sila(x - r.left) - sila(r.right - x)) * EDGE_SPEED),
+           dy: Math.round((sila(y - r.top) - sila(r.bottom - y)) * EDGE_SPEED) };
+}
+let edgeRaf = null, lastMouse = null;
+function moveDragged(cx, cy) {
+  pos[drag.name] = { x: Math.round(cx / view.z - drag.dx), y: Math.round(cy / view.z - drag.dy) };
+  const el = $("blocks").querySelector('[data-node="' + drag.name.replace(/"/g, '\\"') + '"]');
+  if (el) { el.style.left = pos[drag.name].x + "px"; el.style.top = pos[drag.name].y + "px"; }
+  drag.moved = true;
+  renderLinks(); renderMinimap();
+}
+function edgeStep() {
+  edgeRaf = null;
+  if (!drag || !lastMouse) return;
+  const d = edgeDelta(lastMouse.x, lastMouse.y, $("canvas").getBoundingClientRect());
+  if (d.dx || d.dy) {
+    view.x += d.dx; view.y += d.dy;
+    drag.dx -= d.dx / view.z;          // blok zůstane pod kurzorem, svět se posune pod ním
+    drag.dy -= d.dy / view.z;
+    applyView();
+    moveDragged(lastMouse.x, lastMouse.y);
+  }
+  edgeRaf = requestAnimationFrame(edgeStep);
+}
+document.addEventListener("mousemove", ev => {
+  if (drag) {
+    lastMouse = { x: ev.clientX, y: ev.clientY };
+    moveDragged(ev.clientX, ev.clientY);
+    if (edgeRaf === null) edgeRaf = requestAnimationFrame(edgeStep);
+    return;
+  }
+  if (pan) { view.x = ev.clientX - pan.x; view.y = ev.clientY - pan.y; applyView(); }
+});
+document.addEventListener("mouseup", () => {
+  if (drag) {
+    if (drag.moved) { undoStack.push(drag.snap); redoStack.length = 0; updateUndoBtns(); saveLayout(); }
+    drag = null;
+  }
+  if (edgeRaf !== null) { cancelAnimationFrame(edgeRaf); edgeRaf = null; }
+  lastMouse = null;
+  pan = null;
+  $("canvas").classList.remove("panning");
+});
+$("canvas").addEventListener("wheel", ev => {
+  ev.preventDefault();
+  const r = $("canvas").getBoundingClientRect();
+  const mx = ev.clientX - r.left, my = ev.clientY - r.top;
+  const z2 = Math.max(0.2, Math.min(2.5, view.z * (ev.deltaY < 0 ? 1.12 : 1 / 1.12)));
+  view.x = mx - (mx - view.x) * (z2 / view.z);
+  view.y = my - (my - view.y) * (z2 / view.z);
+  view.z = z2;
+  applyView();
+}, { passive: false });
+$("canvas").addEventListener("dblclick", ev => {
+  if (ev.target.closest(".block")) return;
+  addDim();
+});
+/* ==================== Minimapa ==================== */
+const MM = { w: 196, h: 136, pad: 8 };
+let mmMap = null;                 // převod souřadnic plochy na minimapu
+let mmDrag = false;
+/** Obálka celého modelu — podle ní se minimapa škáluje. */
+function modelBounds() {
+  const jm = allNames();
+  if (!jm.length) return null;
+  let x1 = 1e9, y1 = 1e9, x2 = -1e9, y2 = -1e9;
+  for (const n of jm) {
+    const p = getPos(n), s = blockSize(n);
+    x1 = Math.min(x1, p.x); y1 = Math.min(y1, p.y);
+    x2 = Math.max(x2, p.x + s.w); y2 = Math.max(y2, p.y + s.h);
+  }
+  return { x1: x1, y1: y1, x2: x2, y2: y2 };
+}
+function renderMinimap() {
+  const el = $("minimap");
+  el.classList.toggle("on", !!settings.minimap && activeTool === "cube");
+  if (!settings.minimap || activeTool !== "cube") return;
+  const b = modelBounds();
+  if (!b) { $("mmG").innerHTML = ""; mmMap = null; return; }
+  const w = Math.max(1, b.x2 - b.x1), h = Math.max(1, b.y2 - b.y1);
+  const s = Math.min((MM.w - MM.pad * 2) / w, (MM.h - MM.pad * 2) / h);
+  mmMap = { b: b, s: s,
+            ox: MM.pad + (MM.w - MM.pad * 2 - w * s) / 2,
+            oy: MM.pad + (MM.h - MM.pad * 2 - h * s) / 2 };
+  const X = x => mmMap.ox + (x - b.x1) * s, Y = y => mmMap.oy + (y - b.y1) * s;
+
+  let g = "";
+  model.links.forEach(l => {
+    const a = pos[l.from], c = pos[l.to];
+    if (!a || !c) return;
+    const sa = blockSize(l.from), sc = blockSize(l.to);
+    g += '<line x1="' + X(a.x + sa.w / 2) + '" y1="' + Y(a.y + sa.h / 2) +
+         '" x2="' + X(c.x + sc.w / 2) + '" y2="' + Y(c.y + sc.h / 2) +
+         '" class="mml' + (isFact(l.from) ? "" : " snow") + '"/>';
+  });
+  const kresli = (n, trida) => {
+    const p = getPos(n.name), sz = blockSize(n.name);
+    g += '<rect x="' + X(p.x) + '" y="' + Y(p.y) + '" width="' + Math.max(2, sz.w * s) +
+         '" height="' + Math.max(2, sz.h * s) + '" rx="1.5" class="mmb ' + trida +
+         (sel && sel.name === n.name ? " sel" : "") + '"/>';
+  };
+  model.dims.forEach(d => kresli(d, isSnowflaked(d.name) ? "snow" : "dim"));
+  model.facts.forEach(f => kresli(f, "fact"));
+  $("mmG").innerHTML = g;
+  updateMmView();
+}
+/** Obdélník, který ukazuje, na co se právě díváme. */
+function updateMmView() {
+  if (!mmMap || !settings.minimap || activeTool !== "cube") return;
+  const c = $("canvas"), r = $("mmView");
+  const x1 = -view.x / view.z, y1 = -view.y / view.z;
+  const x2 = x1 + c.clientWidth / view.z, y2 = y1 + c.clientHeight / view.z;
+  const X = x => mmMap.ox + (x - mmMap.b.x1) * mmMap.s, Y = y => mmMap.oy + (y - mmMap.b.y1) * mmMap.s;
+  const lx = Math.max(0, X(x1)), ly = Math.max(0, Y(y1));
+  r.setAttribute("x", lx);
+  r.setAttribute("y", ly);
+  r.setAttribute("width", Math.max(3, Math.min(MM.w, X(x2)) - lx));
+  r.setAttribute("height", Math.max(3, Math.min(MM.h, Y(y2)) - ly));
+}
+/** Klepnutí do minimapy přesune plochu tak, aby bylo to místo uprostřed. */
+function mmGoTo(ev) {
+  if (!mmMap) return;
+  const r = $("minimap").getBoundingClientRect();
+  const wx = mmMap.b.x1 + (ev.clientX - r.left - mmMap.ox) / mmMap.s;
+  const wy = mmMap.b.y1 + (ev.clientY - r.top - mmMap.oy) / mmMap.s;
+  const c = $("canvas");
+  view.x = c.clientWidth / 2 - wx * view.z;
+  view.y = c.clientHeight / 2 - wy * view.z;
+  applyView();
+}
+$("minimap").addEventListener("mousedown", ev => { ev.stopPropagation(); mmDrag = true; mmGoTo(ev); });
+document.addEventListener("mousemove", ev => { if (mmDrag) mmGoTo(ev); });
+document.addEventListener("mouseup", () => { mmDrag = false; });
+
+function fitView() {
+  const jm = allNames();
+  if (!jm.length) { view = { x: 0, y: 0, z: 1 }; applyView(); return; }
+  let x1 = 1e9, y1 = 1e9, x2 = -1e9, y2 = -1e9;
+  for (const n of jm) {
+    const p = getPos(n), s = blockSize(n);
+    x1 = Math.min(x1, p.x); y1 = Math.min(y1, p.y);
+    x2 = Math.max(x2, p.x + s.w); y2 = Math.max(y2, p.y + s.h);
+  }
+  const c = $("canvas"), m = 50;
+  const z = Math.min(1.4, Math.min((c.clientWidth - m * 2) / (x2 - x1), (c.clientHeight - m * 2) / (y2 - y1)));
+  view.z = Math.max(0.2, z);
+  view.x = (c.clientWidth - (x2 - x1) * view.z) / 2 - x1 * view.z;
+  view.y = (c.clientHeight - (y2 - y1) * view.z) / 2 - y1 * view.z;
+  applyView();
+}
+
+/* ==================== SQL ==================== */
+/** COUNT DISTINCT má vlastní tvar — COUNT(DISTINCT sloupec), ne COUNT DISTINCT(sloupec). */
+function measureExpr(f, m) {
+  const col = f.table + "." + m.column;
+  return m.agg === "COUNT DISTINCT" ? "COUNT(DISTINCT " + col + ")" : m.agg + "(" + col + ")";
+}
+function buildSql() {
+  const opts = { drop: $("sqlDrop").checked, fks: $("sqlFks").checked, query: $("sqlQuery").checked,
+                 load: $("sqlLoad").checked };
+  const L = [];
+  L.push("-- " + model.name + " — " + model.vendor);
+  L.push("-- vygenerováno nástrojem TORM Cubes, " + new Date().toISOString().slice(0, 10));
+  const sh = shapeInfo();
+  L.push("-- tvar modelu: " + sh.text);
+  L.push("");
+  if (opts.drop) {
+    for (let i = model.facts.length - 1; i >= 0; i--) L.push("DROP TABLE " + model.facts[i].table + ";");
+    for (let i = model.dims.length - 1; i >= 0; i--) L.push("DROP TABLE " + model.dims[i].table + ";");
+    L.push("");
+  }
+  /* dimenze napřed — fakty na ně ukazují */
+  for (const d of model.dims) {
+    const r = [];
+    r.push("    " + d.key + " " + physType({ sqlType: d.keySqlType }, d.keyType) + " NOT NULL");
+    for (const a of d.attributes) r.push("    " + a.column + " " + physType(a, a.type));
+    for (const l of model.links.filter(x => x.from === d.name)) {
+      const cil = dimByName(l.to);
+      r.push("    " + l.column + " " +
+             (cil ? physType({ sqlType: cil.keySqlType }, cil.keyType) : sqlType("integer")));
+    }
+    r.push("    CONSTRAINT PK_" + d.table + " PRIMARY KEY (" + d.key + ")");
+    L.push("CREATE TABLE " + d.table + " (");
+    L.push(r.join(",\n"));
+    L.push(");");
+    L.push("");
+  }
+  for (const f of model.facts) {
+    const r = [], klice = [];
+    for (const l of model.links.filter(x => x.from === f.name)) {
+      const cil = dimByName(l.to);
+      r.push("    " + l.column + " " +
+             (cil ? physType({ sqlType: cil.keySqlType }, cil.keyType) : sqlType("integer")) + " NOT NULL");
+      klice.push(l.column);
+    }
+    for (const m of f.measures) r.push("    " + m.column + " " + physType(m, m.type));
+    if (klice.length)                          // zrnitost = kombinace cizích klíčů
+      r.push("    CONSTRAINT PK_" + f.table + " PRIMARY KEY (" + klice.join(", ") + ")");
+    L.push("CREATE TABLE " + f.table + " (");
+    L.push(r.join(",\n"));
+    L.push(");");
+    L.push("");
+  }
+  if (opts.fks) {
+    for (const l of model.links) {
+      const zdroj = nodeByName(l.from), cil = dimByName(l.to);
+      if (!zdroj || !cil) continue;
+      L.push("ALTER TABLE " + zdroj.table + " ADD CONSTRAINT FK_" + zdroj.table + "_" + cil.table +
+             " FOREIGN KEY (" + l.column + ") REFERENCES " + cil.table + " (" + cil.key + ");");
+    }
+    L.push("");
+  }
+  if (opts.load) {
+    /* Načítací skript z linie dat — pro každou tabulku INSERT … SELECT z jejího zdroje. */
+    L.push("-- Načítací skript z linie dat. Zdroje jsou to, co je vyplněné v nástroji LINIE.");
+    L.push("");
+    const nacti = (n, pary) => {
+      const bezZdroje = pary.filter(p => !p.zdroj);
+      const zdroje = [...new Set(pary.map(p => p.tab).filter(Boolean))];
+      if (!pary.length) return;
+      if (!zdroje.length) {
+        L.push("-- " + (n.table || n.name) + ": žádný sloupec nemá vyplněný zdroj, přeskočeno.");
+        L.push("");
+        return;
+      }
+      if (bezZdroje.length)
+        L.push("-- POZOR " + (n.table || n.name) + ": bez zdroje zůstalo " +
+               bezZdroje.map(p => p.cil).join(", ") + " — v SELECTu je NULL.");
+      L.push("INSERT INTO " + (n.table || n.name) + " (");
+      L.push(pary.map(p => "    " + p.cil).join(",\n"));
+      L.push(")");
+      L.push("SELECT");
+      L.push(pary.map(p => "    " + (p.zdroj || "NULL") + " AS " + p.cil).join(",\n"));
+      L.push("FROM " + zdroje[0] + ";");
+      if (zdroje.length > 1)
+        L.push("-- POZOR: sloupce míří do víc zdrojů (" + zdroje.join(", ") +
+               "). Doplňte si JOIN ručně.");
+      L.push("");
+    };
+    const vsechny = lineageRows();
+    for (const n of model.dims.concat(model.facts)) {
+      const pary = vsechny.filter(r => r.uzel === n)
+        .map(r => ({ cil: r.cil, zdroj: rowText(r), tab: rowTable(r) }))
+        .filter(p => p.cil && p.cil !== "?");
+      nacti(n, pary);
+    }
+  }
+  if (opts.query && model.facts.length) {
+    const f = model.facts[0];
+    L.push("-- Ukázkový dotaz nad " + f.table + ": " +
+           (f.grain ? "zrnitost = " + f.grain : "doplňte si zrnitost"));
+    const vyb = [], joiny = [], grp = [];       // {e: výraz, p: poznámka za čárku}
+    const primo = model.links.filter(l => l.from === f.name);
+    primo.forEach(l => {
+      const d = dimByName(l.to);
+      if (!d) return;
+      const popis = (d.attributes[0] || {}).column || d.key;
+      vyb.push({ e: d.table + "." + popis });
+      grp.push(d.table + "." + popis);
+      joiny.push("  JOIN " + d.table + " ON " + d.table + "." + d.key + " = " + f.table + "." + l.column);
+      /* vločka: každá další úroveň znamená další JOIN */
+      let uzel = d, pojistka = 0;
+      while (pojistka++ < 6) {
+        const dal = model.links.filter(x => x.from === uzel.name)[0];
+        if (!dal) break;
+        const d2 = dimByName(dal.to);
+        if (!d2) break;
+        const popis2 = (d2.attributes[0] || {}).column || d2.key;
+        vyb.push({ e: d2.table + "." + popis2, p: "o úroveň výš přes " + uzel.table + " (vločka)" });
+        grp.push(d2.table + "." + popis2);
+        joiny.push("  JOIN " + d2.table + " ON " + d2.table + "." + d2.key + " = " +
+                   uzel.table + "." + dal.column);
+        uzel = d2;
+      }
+    });
+    f.measures.forEach(m => vyb.push({ e: measureExpr(f, m) + " AS " + m.name }));
+    L.push("SELECT");
+    /* čárka musí být před poznámkou, jinak ji komentář spolkne */
+    L.push(vyb.map((x, i) => "    " + x.e + (i < vyb.length - 1 ? "," : "") +
+                             (x.p ? "   -- " + x.p : "")).join("\n"));
+    L.push("FROM " + f.table);
+    L.push(joiny.join("\n"));
+    if (grp.length) L.push("GROUP BY " + grp.join(", "));
+    L.push("ORDER BY " + (grp[0] || "1") + ";");
+  }
+  return L.join("\n");
+}
+function genSql() {
+  $("sqlArea").value = buildSql();
+  setStatus("SQL vygenerováno pro " + model.vendor + ".", "ok");
+}
+$("btnSqlGen").onclick = genSql;
+["sqlDrop", "sqlFks", "sqlQuery", "sqlLoad"].forEach(id => $(id).onchange = genSql);
+$("btnSqlCopy").onclick = () => {
+  if (!$("sqlArea").value) genSql();
+  try { navigator.clipboard.writeText($("sqlArea").value); } catch (e) { $("sqlArea").select(); }
+  setStatus("SQL zkopírováno.", "ok");
+};
+$("btnSqlDown").onclick = () => {
+  if (!$("sqlArea").value) genSql();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([$("sqlArea").value], { type: "text/plain;charset=utf-8" }));
+  a.download = "kostka-" + model.vendor + ".sql";
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+/* ==================== Dopadová analýza: co se stane, když tohle smažu ==================== */
+/* Cíl je { kind, name } pro fakt/dimenzi, { kind:"link", idx },
+   nebo { kind:"measure"|"attr", name, idx } pro jednu položku uvnitř. */
+function impactOf(cil) {
+  const out = [];
+  const zlom = t => out.push({ sev: "err", text: t });     // rozbije se
+  const zmena = t => out.push({ sev: "warn", text: t });   // změní se
+  const info = t => out.push({ sev: "info", text: t });    // stojí za zmínku
+  const tab = n => (n && (n.table || n.name)) || "?";
+
+  if (cil.kind === "fact" || cil.kind === "dim") {
+    const n = nodeByName(cil.name);
+    if (!n) return out;
+    const ven = model.links.filter(l => l.from === cil.name);
+    const dovnitr = model.links.filter(l => l.to === cil.name);
+
+    if (cil.kind === "fact") {
+      if (model.facts.length === 1) zlom("Byl by to poslední fakt — kostka by neměla co měřit.");
+      if (n.measures.length)
+        zmena("Zmizí " + n.measures.length + " měřítek: " +
+              n.measures.map(m => m.name).join(", ") + ". Nikde jinde v modelu nejsou.");
+      ven.forEach(l => {
+        const d = dimByName(l.to);
+        const jini = model.links.filter(x => x.to === l.to && x.from !== cil.name);
+        if (!jini.length) zmena("Dimenze " + l.to + " zůstane viset — nic jiného na ni neukazuje.");
+        else info("Dimenze " + l.to + " zůstane, ukazuje na ni ještě " + jini.length + " jiných.");
+        if (d) void d;
+      });
+    } else {
+      dovnitr.forEach(l => {
+        if (isFact(l.from)) {
+          const zbyle = model.links.filter(x => x.from === l.from && x.to !== cil.name).length;
+          if (!zbyle) zlom("Fakt " + l.from + " by zůstal bez jediné dimenze — nešlo by ho řezat.");
+          else zmena("Fakt " + l.from + " přijde o řez podle " + cil.name + " a o sloupec " +
+                     (l.column || "?") + " ve své tabulce (zbydou mu " + zbyle + ").");
+        } else {
+          zmena("Dimenze " + l.from + " přijde o nadřazenou úroveň — z vločky se stane hvězda.");
+        }
+      });
+      ven.forEach(l => {
+        const jini = model.links.filter(x => x.to === l.to && x.from !== cil.name);
+        if (!jini.length) zmena("Dimenze " + l.to + " zůstane viset — ukazovala na ni jen " + cil.name + ".");
+      });
+      if (n.attributes && n.attributes.length)
+        zmena("Zmizí " + n.attributes.length + " atributů: " +
+              n.attributes.map(a => a.name).join(", ") + " — už podle nich nepůjde řezat.");
+      if (n.hierarchies && n.hierarchies.length)
+        zmena("Zmizí " + n.hierarchies.length + " hierarchie (" +
+              n.hierarchies.map(h => h.name).join(", ") + ") a s ní i vrtání po úrovních.");
+    }
+    if (ven.length + dovnitr.length)
+      info("Smaže se " + (ven.length + dovnitr.length) + " vazeb, které na " + cil.name + " visí.");
+    const radky = lineageRows().filter(r => r.uzel === n);
+    if (radky.length)
+      info("Z linie dat zmizí " + radky.length + " řádků a z načítacího skriptu celý INSERT do " + tab(n) + ".");
+    const sh = shapeInfo();
+    if (sh.kind === "snow") {
+      const zbyle = model.links.filter(l => !isFact(l.from) && l.from !== cil.name && l.to !== cil.name);
+      if (!zbyle.length) info("Model přestane být vločka a bude z něj čistá hvězda.");
+    }
+    return out;
+  }
+
+  if (cil.kind === "link") {
+    const l = model.links[cil.idx];
+    if (!l) return out;
+    const zdroj = nodeByName(l.from);
+    if (isFact(l.from)) {
+      const zbyle = model.links.filter(x => x.from === l.from && x !== l).length;
+      if (!zbyle) zlom("Fakt " + l.from + " by zůstal bez jediné dimenze — nešlo by ho řezat.");
+      else zmena("Fakt " + l.from + " přijde o řez podle " + l.to + " (zbydou mu " + zbyle + ").");
+      zmena("Z tabulky " + tab(zdroj) + " vypadne sloupec " + (l.column || "?") +
+            " a z primárního klíče faktu taky — mění se tím zrnitost.");
+    } else {
+      zmena("Z vločky se stane hvězda: " + l.from + " přestane mít nadřazenou úroveň.");
+      zmena("Z tabulky " + tab(zdroj) + " vypadne sloupec " + (l.column || "?") + ".");
+    }
+    const jini = model.links.filter(x => x.to === l.to && x !== l);
+    if (!jini.length) zmena("Dimenze " + l.to + " zůstane viset — nic jiného na ni neukazuje.");
+    info("Z ukázkového dotazu zmizí JOIN na " + l.to +
+         (isFact(l.from) ? "" : " i navazující JOIN o úroveň výš") + ".");
+    return out;
+  }
+
+  const n = nodeByName(cil.name);
+  if (!n) return out;
+  if (cil.kind === "measure") {
+    const m = n.measures[cil.idx];
+    if (!m) return out;
+    if (n.measures.length === 1) zlom("Bylo by to poslední měřítko faktu " + n.name + " — nebylo by co měřit.");
+    zmena("Z tabulky " + tab(n) + " vypadne sloupec " + (m.column || m.name) + ".");
+    info("Z ukázkového dotazu zmizí " + m.agg + "(" + (m.column || m.name) + ").");
+    if (srcText(n, m)) info("Z linie dat zmizí napojení na " + srcText(n, m) + ".");
+    return out;
+  }
+  if (cil.kind === "attr") {
+    const a = n.attributes[cil.idx];
+    if (!a) return out;
+    const vHier = (n.hierarchies || []).filter(h => h.levels.indexOf(a.name) >= 0);
+    vHier.forEach(h => zlom("Hierarchie " + h.name + " odkazuje na " + a.name +
+                            " — po smazání by ukazovala do prázdna."));
+    if (n.attributes.length === 1) zmena("Dimenze " + n.name + " zůstane bez atributů, nebude podle čeho řezat.");
+    if (n.attributes[0] === a && n.attributes.length > 1)
+      info("Ukázkový dotaz použije místo něj další atribut (" + n.attributes[1].name + ").");
+    zmena("Z tabulky " + tab(n) + " vypadne sloupec " + (a.column || a.name) + ".");
+    if (srcText(n, a)) info("Z linie dat zmizí napojení na " + srcText(n, a) + ".");
+    return out;
+  }
+  return out;
+}
+/** Všechny prvky modelu i s tím, kolik toho na nich visí. */
+function impactRows() {
+  const out = [];
+  model.facts.forEach(f => {
+    out.push({ kind: "fact", name: f.name, popis: "fakt", uzel: f });
+    f.measures.forEach((m, i) => out.push({ kind: "measure", name: f.name, idx: i, uzel: f,
+      popis: "měřítko " + f.name, label: m.name }));
+  });
+  model.dims.forEach(d => {
+    out.push({ kind: "dim", name: d.name, popis: "dimenze", uzel: d });
+    d.attributes.forEach((a, i) => out.push({ kind: "attr", name: d.name, idx: i, uzel: d,
+      popis: "atribut " + d.name, label: a.name }));
+  });
+  model.links.forEach((l, i) => out.push({ kind: "link", idx: i, uzel: null,
+    popis: isFact(l.from) ? "vazba fakt→dimenze" : "vazba vločky",
+    label: l.from + " → " + l.to }));
+  return out.map(r => {
+    const d = impactOf(r);
+    return Object.assign(r, { dopad: d,
+      zlomy: d.filter(x => x.sev === "err").length,
+      zmeny: d.filter(x => x.sev === "warn").length });
+  });
+}
+
+let dopOpen = {};                // rozbalené položky v přehledu dopadů
+function dopKey(r) { return r.kind + ":" + (r.name || "") + ":" + (r.idx === undefined ? "" : r.idx); }
+function dopLabel(r) { return r.label || r.name; }
+function renderDopad() {
+  const q = ($("dopFilter").value || "").trim().toLowerCase();
+  let vse = impactRows();
+  const rizik = vse.filter(r => r.zlomy || r.zmeny).length;
+  $("dopInfo").textContent = vse.length + " prvků · " + rizik + " s dopadem · " +
+    vse.filter(r => r.zlomy).length + " by něco rozbilo";
+  if ($("dopOnlyRisk").checked) vse = vse.filter(r => r.zlomy || r.zmeny);
+  if (q) vse = vse.filter(r => (dopLabel(r) + " " + r.popis).toLowerCase().indexOf(q) >= 0);
+  if ($("dopSort").checked)
+    vse = vse.slice().sort((a, b) => (b.zlomy * 10 + b.zmeny) - (a.zlomy * 10 + a.zmeny));
+
+  let h = '<div class="linlegend">Co se stane, když prvek <b>smažete</b>. ' +
+    '<span class="znak err">rozbije</span> je chyba, se kterou model nebude dávat smysl, ' +
+    '<span class="znak warn">změní</span> je následek, který přežije, a modrý řádek je jen ' +
+    "poznámka, co se přepíše v SQL nebo v linii. Klepnutím na řádek se prvek vybere na ploše.</div>";
+  if (!vse.length) h += '<div class="hint">' + (q ? "Nic neodpovídá filtru."
+    : "Žádný prvek nemá na co dopadnout — model je zatím jednoduchý.") + "</div>";
+  vse.forEach(r => {
+    const k = dopKey(r), open = !!dopOpen[k];
+    const znak = r.zlomy ? '<span class="znak err">rozbije ' + r.zlomy + "</span>"
+               : r.zmeny ? '<span class="znak warn">změní ' + r.zmeny + "</span>"
+               : '<span class="znak ok">bez dopadu</span>';
+    h += '<div class="dopitem ' + r.kind + '"><div class="hd" data-dop="' + esc(k) + '">' +
+      '<span class="car">' + (open ? "▾" : "▸") + "</span>" +
+      '<span class="nm">' + esc(dopLabel(r)) + "</span>" +
+      '<span class="kd">' + esc(r.popis) + "</span><span class=\"spacer\"></span>" + znak +
+      '<button class="b sm" data-dopgo="' + esc(k) + '">Ukázat</button></div>';
+    h += '<div class="bd' + (open ? "" : " off") + '">';
+    if (!r.dopad.length) h += '<div class="hint">Nic na něm nevisí — smazání se nikde neprojeví.</div>';
+    r.dopad.forEach(x => h += '<div class="dopline ' + x.sev + '">' + esc(x.text) + "</div>");
+    h += "</div></div>";
+  });
+  $("dopBody").innerHTML = h;
+
+  const podleKlice = {};
+  impactRows().forEach(r => { podleKlice[dopKey(r)] = r; });
+  $("dopBody").querySelectorAll("[data-dop]").forEach(el => el.onclick = ev => {
+    if (ev.target.closest("button")) return;
+    dopOpen[el.dataset.dop] = !dopOpen[el.dataset.dop];
+    renderDopad();
+  });
+  $("dopBody").querySelectorAll("[data-dopgo]").forEach(b => b.onclick = () => {
+    const r = podleKlice[b.dataset.dopgo];
+    if (!r) return;
+    if (r.kind === "link") sel = { kind: "link", idx: r.idx };
+    else sel = { kind: isFact(r.name) ? "fact" : "dim", name: r.name };
+    setTool("cube");
+    if (sel.name) centerOn(sel.name);
+  });
+}
+$("dopFilter").oninput = renderDopad;
+$("dopOnlyRisk").onchange = renderDopad;
+$("dopSort").onchange = renderDopad;
+
+/* ==================== Linie dat: odkud se který sloupec bere ==================== */
+let zdrojoveSloupce = [];        // našeptávač načtený z relačního schématu
+
+/** Všechny cílové sloupce kostky i s tím, odkud se plní. */
+function lineageRows() {
+  const out = [];
+  model.dims.forEach((d, di) => {
+    out.push({ uzel: d, kind: "dim", ui: di, cil: d.key || "?", role: "klíč",
+               obj: d, pole: "keySrc", typ: d.keyType });
+    d.attributes.forEach((a, i) => out.push({ uzel: d, kind: "dim", ui: di, cil: a.column || a.name || "?",
+               role: "atribut", obj: a, pole: "src", typ: a.type, idx: i }));
+  });
+  model.facts.forEach((f, fi) => {
+    model.links.filter(l => l.from === f.name).forEach(l =>
+      out.push({ uzel: f, kind: "fact", ui: fi, cil: l.column || "?", role: "cizí klíč",
+                 obj: l, pole: "src", typ: "integer", odkaz: l.to }));
+    f.measures.forEach((m, i) => out.push({ uzel: f, kind: "fact", ui: fi, cil: m.column || m.name || "?",
+               role: "měřítko", obj: m, pole: "src", typ: m.type, idx: i }));
+  });
+  return out;
+}
+/* Zdroj řádku — klíč dimenze ho má v keySrc, ostatní v src, tak se na to musí přes r.pole. */
+function rowSrc(r) { return r.obj[r.pole] || newSrc(); }
+function rowText(r) { return srcText(r.uzel, { src: rowSrc(r) }); }
+function rowTable(r) { return srcOf(r.uzel, { src: rowSrc(r) }).table; }
+
+function renderLineage() {
+  const q = ($("linFilter").value || "").trim().toLowerCase();
+  const jenChybi = $("linOnlyMissing").checked;
+  const vse = lineageRows();
+  const chybi = vse.filter(r => !rowText(r)).length;
+  $("linInfo").textContent = vse.length + " sloupců · " +
+    (chybi ? chybi + " bez zdroje" : "všechny mají zdroj");
+
+  let h = '<div class="linlegend">Ke každému sloupci kostky se píše, <b>odkud se bere</b> — ' +
+    "zdrojová tabulka a sloupec, nebo výraz, když se počítá. Prázdný <b>zdroj</b> u tabulky se " +
+    "použije pro všechny její sloupce, takže ho stačí vyplnit jednou nahoře. Z téhle linie " +
+    "umí nástroj <b>SQL</b> vygenerovat načítací skript <code>INSERT … SELECT</code>.</div>";
+
+  const skupiny = model.dims.map(d => ({ n: d, k: "dim" }))
+    .concat(model.facts.map(f => ({ n: f, k: "fact" })));
+  let videno = 0;
+  for (const g of skupiny) {
+    let radky = vse.filter(r => r.uzel === g.n);
+    if (jenChybi) radky = radky.filter(r => !rowText(r));
+    if (q) radky = radky.filter(r =>
+      (r.cil + " " + rowText(r) + " " + g.n.name + " " + (g.n.sourceTable || ""))
+        .toLowerCase().indexOf(q) >= 0);
+    if (!radky.length) continue;
+    videno += radky.length;
+    const idx = g.k === "dim" ? model.dims.indexOf(g.n) : model.facts.indexOf(g.n);
+    h += '<div class="lintab ' + g.k + '"><div class="hd"><span class="nm">' + esc(g.n.table || g.n.name) +
+      '</span><span class="n">' + (g.k === "dim" ? "dimenze" : "fakt") + "</span>" +
+      '<span class="spacer"></span><label class="f" style="margin:0 6px 0 0">Zdroj tabulky</label>' +
+      '<input type="text" list="zdrojeTab" data-lsrc="' + g.k + ":" + idx +
+      '" value="' + esc(g.n.sourceTable || "") + '" placeholder="např. ORDERS"></div>';
+    h += '<table class="lingrid"><thead><tr><th style="width:180px">Sloupec kostky</th>' +
+      '<th style="width:80px">Role</th><th class="sip"></th>' +
+      '<th style="width:150px">Zdrojová tabulka</th><th style="width:150px">Zdrojový sloupec</th>' +
+      '<th>Výraz (místo sloupce)</th></tr></thead><tbody>';
+    radky.forEach(r => {
+      const s = (r.obj[r.pole] = r.obj[r.pole] || newSrc());
+      const ma = !!rowText(r);
+      const da = 'data-lr="' + vse.indexOf(r) + '" data-lf=';
+      h += "<tr" + (ma ? "" : ' class="chybi"') + '><td class="cil">' + esc(r.cil) +
+        (r.odkaz ? ' <span style="color:var(--txt3)">→ ' + esc(r.odkaz) + "</span>" : "") + "</td>" +
+        '<td style="color:var(--txt3)">' + esc(r.role) + "</td>" +
+        '<td class="sip">' + (ma ? "←" : "?") + "</td>" +
+        "<td><input type=\"text\" list=\"zdrojeTab\" " + da + '"table" value="' + esc(s.table) +
+          '" placeholder="' + esc(r.uzel.sourceTable || "—") + "\"></td>" +
+        "<td><input type=\"text\" list=\"zdrojeSl\" " + da + '"column" value="' + esc(s.column) + "\"></td>" +
+        "<td><input type=\"text\" " + da + '"expr" value="' + esc(s.expr) +
+          '" placeholder="např. UPPER(NAZEV) nebo SUM(CENA)"></td></tr>';
+    });
+    h += "</tbody></table></div>";
+  }
+  if (!videno) h += '<div class="hint">' + (q || jenChybi ? "Nic neodpovídá filtru."
+    : "Kostka zatím nemá žádné sloupce.") + "</div>";
+  $("linBody").innerHTML = h;
+
+  $("linBody").querySelectorAll("[data-lr][data-lf]").forEach(el => el.oninput = () => {
+    const r = vse[+el.dataset.lr];
+    if (!r) return;
+    r.obj[r.pole] = r.obj[r.pole] || newSrc();
+    r.obj[r.pole][el.dataset.lf] = el.value;
+    $("linInfo").textContent = vse.length + " sloupců · " +
+      (vse.filter(x => !rowText(x)).length || "všechny mají zdroj");
+  });
+  $("linBody").querySelectorAll("[data-lsrc]").forEach(el => el.oninput = () => {
+    const p = el.dataset.lsrc.split(":");
+    const n = p[0] === "dim" ? model.dims[+p[1]] : model.facts[+p[1]];
+    if (n) n.sourceTable = el.value;
+  });
+}
+$("linFilter").oninput = renderLineage;
+$("linOnlyMissing").onchange = renderLineage;
+/* ze schématu z Canvasu si vytáhneme názvy tabulek a sloupců do našeptávače */
+$("btnLinSchema").onclick = () => $("fileSchema").click();
+$("fileSchema").onchange = ev => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const doc = new DOMParser().parseFromString(String(r.result), "text/xml");
+      const tab = [], sl = [];
+      Array.from(doc.getElementsByTagName("*")).forEach(el => {
+        if (el.localName === "table" && el.getAttribute("name")) tab.push(el.getAttribute("name"));
+        if (el.localName === "column" && el.getAttribute("name")) sl.push(el.getAttribute("name"));
+      });
+      zdrojoveSloupce = { tabulky: [...new Set(tab)], sloupce: [...new Set(sl)] };
+      $("zdrojeTab").innerHTML = zdrojoveSloupce.tabulky.map(t => '<option value="' + esc(t) + '"></option>').join("");
+      $("zdrojeSl").innerHTML = zdrojoveSloupce.sloupce.map(c => '<option value="' + esc(c) + '"></option>').join("");
+      setStatus("Ze schématu načteno " + zdrojoveSloupce.tabulky.length + " tabulek a " +
+                zdrojoveSloupce.sloupce.length + " sloupců do našeptávače.", "ok");
+    } catch (e) { setStatus("Schéma se nepodařilo načíst: " + e.message, "err"); }
+  };
+  r.readAsText(f);
+  ev.target.value = "";
+};
+
+/* ==================== Nástroje, panely, nastavení ==================== */
+let activeTool = "cube";
+function setTool(t) {
+  activeTool = t;
+  document.querySelectorAll("[data-tool]").forEach(b => b.classList.toggle("act", b.dataset.tool === t));
+  $("canvas").style.display = t === "cube" ? "" : "none";
+  $("sql").classList.toggle("on", t === "sql");
+  $("lin").classList.toggle("on", t === "lin");
+  $("dop").classList.toggle("on", t === "dop");
+  $("phTitle").textContent = t === "cube" ? "Vlastnosti" : "Kostka";
+  if (t === "sql") genSql();
+  if (t === "lin") renderLineage();
+  if (t === "dop") renderDopad();
+  render();
+}
+document.querySelectorAll("[data-tool]").forEach(b => b.onclick = () => { b.blur(); setTool(b.dataset.tool); });
+$("btnSqlTool").onclick = () => setTool("sql");
+
+function togglePanel(show) {
+  const off = show === undefined ? $("panel").classList.toggle("off") : $("panel").classList.toggle("off", !show);
+  $("btnPanel").classList.toggle("act", !off);
+  $("stubPanel").classList.toggle("on", off);
+}
+function toggleBrowser(show) {
+  const off = show === undefined ? $("browser").classList.toggle("off") : $("browser").classList.toggle("off", !show);
+  $("btnBrowser").classList.toggle("act", !off);
+  $("stubBrowser").classList.toggle("on", off);
+}
+$("btnPanel").onclick = () => togglePanel();
+$("btnBrowser").onclick = () => toggleBrowser();
+$("btnPanelHide").onclick = () => togglePanel(false);
+$("btnBrowserHide").onclick = () => toggleBrowser(false);
+$("stubPanel").onclick = () => togglePanel(true);
+$("stubBrowser").onclick = () => toggleBrowser(true);
+
+function closePops(except) {
+  [["popAccount", "btnAccount"], ["popSettings", "btnSettings"]].forEach(x => {
+    if (x[0] === except) return;
+    $(x[0]).classList.remove("on"); $(x[1]).classList.remove("act");
+  });
+}
+function togglePop(p, b) { const on = $(p).classList.toggle("on"); $(b).classList.toggle("act", on); closePops(on ? p : null); }
+$("btnAccount").onclick = ev => { ev.stopPropagation(); togglePop("popAccount", "btnAccount"); };
+$("btnSettings").onclick = ev => { ev.stopPropagation(); togglePop("popSettings", "btnSettings"); };
+document.addEventListener("mousedown", ev => {
+  if (!(ev.target && ev.target.closest && ev.target.closest("#rail"))) closePops(null);
+});
+$("btnClearLayout").onclick = () => {
+  pos = {}; try { localStorage.removeItem(LS_KEY); } catch (e) {}
+  autoLayout(); closePops(null);
+  setStatus("Rozmístění vymazáno a srovnáno znovu.", "ok");
+};
+function loadSettings() {
+  try { const r = localStorage.getItem(SET_KEY); if (r) settings = Object.assign(settings, JSON.parse(r) || {}); }
+  catch (e) {}
+  applySettings();
+}
+function applySettings() {
+  try { localStorage.setItem(SET_KEY, JSON.stringify(settings)); } catch (e) {}
+  $("canvas").style.backgroundImage = settings.grid
+    ? "radial-gradient(circle, #262a2f 1px, transparent 1px)" : "none";
+  syncSettingsUI();
+  if (activeTool === "cube") { renderBlocks(); renderMinimap(); }
+}
+function syncSettingsUI() {
+  $("setGrid").checked = settings.grid;
+  $("setTypes").checked = settings.types;
+  $("setMinimap").checked = settings.minimap;
+  $("btnMinimap").classList.toggle("act", settings.minimap);
+  if ($("setVendor").value !== model.vendor) $("setVendor").value = model.vendor;
+}
+$("setGrid").onchange = () => { settings.grid = $("setGrid").checked; applySettings(); };
+$("setTypes").onchange = () => { settings.types = $("setTypes").checked; applySettings(); renderLinks(); };
+$("setMinimap").onchange = () => { settings.minimap = $("setMinimap").checked; applySettings(); renderMinimap(); };
+$("btnMinimap").onclick = () => {
+  settings.minimap = !settings.minimap;
+  applySettings(); renderMinimap();
+  setStatus("Minimapa " + (settings.minimap ? "zapnuta." : "vypnuta."));
+};
+$("setVendor").onchange = () => {
+  if ($("setVendor").value === model.vendor) return;
+  pushUndo();
+  model.vendor = $("setVendor").value;
+  if (activeTool === "sql") genSql();
+  render();
+  setStatus("Databáze projektu: " + model.vendor + ".", "ok");
+};
+
+/* ---- pás karet ---- */
+document.querySelectorAll("[data-rtab]").forEach(b => b.onclick = () => {
+  document.querySelectorAll("[data-rtab]").forEach(x => x.classList.toggle("act", x === b));
+  document.querySelectorAll("[data-rpage]").forEach(p => p.classList.toggle("act", p.dataset.rpage === b.dataset.rtab));
+  $("ribbon").classList.remove("collapsed");
+});
+$("btnRibbon").onclick = () => {
+  const col = $("ribbon").classList.toggle("collapsed");
+  $("btnRibbon").querySelector("svg").style.transform = col ? "rotate(180deg)" : "";
+};
+document.querySelectorAll("#ribbon button, #titlebar button").forEach(b =>
+  b.addEventListener("click", () => b.blur()));
+function setLevel(l) {
+  level = l;
+  document.querySelectorAll("[data-level]").forEach(b => b.classList.toggle("act", b.dataset.level === l));
+  render();
+  if (activeTool === "sql") genSql();
+  setStatus(LEVELS[l].nazev + " — " + LEVELS[l].popis.replace(/<[^>]+>/g, ""));
+}
+document.querySelectorAll("[data-level]").forEach(b => b.onclick = () => { b.blur(); setLevel(b.dataset.level); });
+/* nejdřív přepnout úroveň, pak odvodit — ať hlášku o odvození nepřebije popis úrovně */
+$("btnGenLdm").onclick = () => { setLevel("ldm"); odvod("ldm"); };
+$("btnGenPdm").onclick = () => { setLevel("pdm"); odvod("pdm"); };
+$("btnGenAll").onclick = () => { setLevel("pdm"); odvod("vse"); };
+$("btnAddFact").onclick = addFact;
+$("btnAddDim").onclick = addDim;
+$("btnDelSel").onclick = deleteSelection;
+$("btnUndo").onclick = undo; $("btnRedo").onclick = redo;
+$("btnUndo2").onclick = undo; $("btnRedo2").onclick = redo;
+$("btnLayout").onclick = () => autoLayout();
+$("btnFit").onclick = fitView;
+$("btnChecks").onclick = () => { togglePanel(true); sel = null; render(); };
+document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+const zIn = () => { view.z = Math.min(2.5, view.z * 1.2); applyView(); };
+const zOut = () => { view.z = Math.max(0.2, view.z / 1.2); applyView(); };
+const zOne = () => { view.z = 1; applyView(); };
+$("zIn").onclick = zIn; $("zOut").onclick = zOut; $("zReset").onclick = zOne;
+$("zIn2").onclick = zIn; $("zOut2").onclick = zOut; $("zReset2").onclick = zOne;
+
+/* ---- klávesy ---- */
+function isEditing() {
+  const a = document.activeElement;
+  return a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+}
+document.addEventListener("keydown", ev => {
+  if (ev.key === "Escape") {
+    if ($("modal").classList.contains("on")) { closeModal(); return; }
+    if (mode !== "select") { setMode("select"); return; }
+  }
+  if ((ev.key === "Delete" || ev.key === "Del") && !isEditing() && !$("modal").classList.contains("on")) {
+    ev.preventDefault(); deleteSelection();
+  }
+  if (ev.ctrlKey && !ev.altKey) {
+    const k = ev.key.toLowerCase();
+    if (k === "z" && !ev.shiftKey) { ev.preventDefault(); undo(); }
+    if (k === "y" || (k === "z" && ev.shiftKey)) { ev.preventDefault(); redo(); }
+  }
+});
+/* jeden krok zpět na jednu upravenou buňku */
+$("panel").addEventListener("focusin", ev => {
+  if (/^(INPUT|SELECT|TEXTAREA)$/.test(ev.target.tagName)) fieldSnap = snapshot();
+});
+$("panel").addEventListener("focusout", ev => {
+  if (!/^(INPUT|SELECT|TEXTAREA)$/.test(ev.target.tagName)) return;
+  if (fieldSnap && fieldSnap !== snapshot()) pushUndo(fieldSnap);
+  fieldSnap = null;
+});
+
+/* ==================== XML okno ==================== */
+function setMsg(t, c) { const e = $("xmlMsg"); e.textContent = t; e.className = "msg " + (c || ""); }
+function openModal() { $("modal").classList.add("on"); doGen(); }
+function closeModal() { $("modal").classList.remove("on"); }
+function doGen() {
+  $("xmlArea").value = serializeModel(model);
+  setMsg("XML vygenerováno z plochy (" + model.facts.length + " faktů, " + model.dims.length + " dimenzí).", "ok");
+}
+$("btnXml").onclick = openModal;
+$("btnClose").onclick = closeModal;
+$("btnGen").onclick = doGen;
+$("btnLoad").onclick = () => {
+  try {
+    const snap = snapshot();
+    model = parseXml($("xmlArea").value);
+    undoStack.push(snap); redoStack.length = 0; updateUndoBtns();
+    sel = null;
+    ensurePositions();
+    render();
+    if (activeTool === "sql") genSql();
+    setMsg("Načteno: " + model.facts.length + " faktů, " + model.dims.length + " dimenzí, " +
+           model.links.length + " vazeb.", "ok");
+    setStatus("Model načten. Tvar: " + shapeInfo().text, "ok");
+  } catch (e) { setMsg(e.message, "err"); }
+};
+$("fileXml").onchange = ev => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { $("xmlArea").value = String(r.result); setMsg("Soubor načten — tlačítkem Načíst do plochy ho otevřete."); };
+  r.readAsText(f);
+  ev.target.value = "";
+};
+$("btnDown").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([$("xmlArea").value || serializeModel(model)],
+                                        { type: "application/xml;charset=utf-8" }));
+  a.download = "kostka.xml";
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+$("btnCopy").onclick = () => {
+  try { navigator.clipboard.writeText($("xmlArea").value); setMsg("Zkopírováno.", "ok"); }
+  catch (e) { $("xmlArea").select(); setMsg("Zkopírováno.", "ok"); }
+};
+$("btnExample").onclick = () => { $("xmlArea").value = EXAMPLE; setMsg("Ukázka vložena — Načíst do plochy."); };
+$("modal").addEventListener("mousedown", ev => { if (ev.target === $("modal")) closeModal(); });
+$("btnOpen2").onclick = () => { openModal(); $("fileXml").click(); };
+$("btnSave2").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([serializeModel(model)], { type: "application/xml;charset=utf-8" }));
+  a.download = "kostka.xml";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  setStatus("Uloženo jako kostka.xml.", "ok");
+};
+$("btnExample2").onclick = () => { openModal(); $("xmlArea").value = EXAMPLE; setMsg("Ukázka vložena — Načíst do plochy."); };
+
+/* ==================== Start ==================== */
+loadLayout();
+loadSettings();
+try { model = parseXml(EXAMPLE); } catch (e) { console.error(e); model = emptyModel(); }
+ensurePositions();
+applyView();
+render();
+setTimeout(fitView, 0);
+updateUndoBtns();
+setStatus("Ukázková kostka Prodej — hvězda se dvěma úrovněmi zboží, tedy vločka.");
+</script>
+</body>
+</html>
